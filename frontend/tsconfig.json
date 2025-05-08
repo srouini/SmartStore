@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": false,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.main.tsbuildinfo"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

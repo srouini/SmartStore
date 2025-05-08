@@ -1,0 +1,48 @@
+export interface Phone {
+    id: number;
+    name: string;
+    brand: number;
+    brand_name: string;
+    model: number;
+    model_name: string;
+    code: string;
+    cost_price: number;
+    selling_unite_price: number;
+    selling_semi_bulk_price: number | null;
+    selling_bulk_price: number | null;
+    description: string | null;
+    note: string | null;
+    sku: string | null;
+    photo: string | null;
+    created_at: string;
+    updated_at: string;
+    product_type: string;
+    processor: string | null;
+    ram_gb: number | null;
+    storage_gb: number | null;
+    screen_size_inch: number | null;
+    screen_type: string | null;
+    screen_type_display: string | null;
+    operating_system: string | null;
+    rear_camera_mp: string | null;
+    front_camera_mp: string | null;
+    battery_mah: number | null;
+    color: string | null;
+    condition: string;
+    condition_display: string;
+    version: string;
+    version_display: string;
+    phone_type: string;
+    phone_type_display: string;
+    stock_quantity: number;
+}
+declare const phoneService: {
+    getAllPhones: (params?: Record<string, any>) => Promise<any>;
+    getPhoneById: (id: number) => Promise<any>;
+    createPhone: (phoneData: FormData) => Promise<any>;
+    updatePhone: (id: number, phoneData: FormData) => Promise<any>;
+    deletePhone: (id: number) => Promise<any>;
+    searchByCode: (code: string) => Promise<any>;
+    searchByName: (name: string) => Promise<any>;
+};
+export default phoneService;

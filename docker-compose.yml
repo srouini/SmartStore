@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # Django Backend with SQLite
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend/media:/app/media
+      - ./backend/static:/app/static
+      - sqlite_data:/app/data
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=change_this_to_a_secure_secret_key_in_production
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend,216.158.234.163,216.158.234.163:8001
+      - DATABASE_ENGINE=django.db.backends.sqlite3
+      - DATABASE_NAME=/app/data/db.sqlite3
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+
+  # Frontend - Nginx serving static files
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:
