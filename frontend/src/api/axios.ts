@@ -3,9 +3,23 @@ import axios from 'axios';
 // Token storage key
 export const TOKEN_STORAGE_KEY = 'smartstore_auth_token';
 
+// Determine the API base URL based on the current host
+const getApiBaseUrl = () => {
+  const currentHost = window.location.hostname;
+  
+  // If we're on localhost, use the proxy setup in the Vite config
+  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+    return '/api/';
+  }
+  
+  // For production or other environments, use the same host but with port 8000
+  // This assumes the backend is always on port 8000
+  return `http://${currentHost}:8000/api/`;
+};
+
 // Create an Axios instance with default config
 const api = axios.create({
-  baseURL: 'http://216.158.234.163/api/',
+  baseURL: getApiBaseUrl(),
   withCredentials: true, // Important for sending cookies with requests
   headers: {
     'Content-Type': 'application/json',
