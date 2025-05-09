@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
-from django.db import transaction
+from django.db import transaction, models
 from django.utils import timezone
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
@@ -543,6 +543,12 @@ class CaisseOperationViewSet(viewsets.ReadOnlyModelViewSet):
             print(f"Filtering operations by caisse_id: {caisse_id}")
             queryset = queryset.filter(caisse_id=caisse_id)
         
+        # Explicitly handle operation_type filter
+        operation_type = self.request.query_params.get('operation_type', None)
+        if operation_type:
+            print(f"Filtering operations by operation_type: {operation_type}")
+            queryset = queryset.filter(operation_type=operation_type)
+        
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
@@ -551,6 +557,16 @@ class CaisseOperationViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(timestamp__gte=start_date)
         if end_date:
             queryset = queryset.filter(timestamp__lte=end_date)
+        
+        # Add search parameter handling
+        search = self.request.query_params.get('search', None)
+        if search:
+            # Include performed_by__username in search
+            queryset = queryset.filter(
+                models.Q(description__icontains=search) | 
+                models.Q(reference_id__icontains=search) | 
+                models.Q(performed_by__username__icontains=search)
+            )
         
         print(f"CaisseOperation query: {queryset.query}")
         return queryset

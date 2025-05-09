@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getCaisses, depositFunds, withdrawFunds, getCaisseOperations, createCaisse } from '../services/caisseService';
 import { Caisse as CaisseType, CaisseOperation, PaginatedResponse } from '../types/Caisse';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import React from 'react';
 
 const Caisse = () => {
   const [caisses, setCaisses] = useState<CaisseType[]>([]);
@@ -12,6 +14,25 @@ const Caisse = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOperations, setTotalOperations] = useState(0);
+  
+  // Tab management
+  const [activeTab, setActiveTab] = useState<'operations' | 'reports'>('operations');
+  
+  // Filter states
+  const [filterOperationType, setFilterOperationType] = useState<string>('');
+  const [filterAmountGreaterThan, setFilterAmountGreaterThan] = useState<string>('');
+  const [filterAmountLessThan, setFilterAmountLessThan] = useState<string>('');
+  const [filterPerformedBy, setFilterPerformedBy] = useState<string>('');
+  const [filterDate, setFilterDate] = useState<string>('');
+
+  // Reports data
+  const [reportData, setReportData] = useState({
+    totalDeposits: 0,
+    totalWithdrawals: 0,
+    todayOperations: 0,
+    weeklyOperations: 0,
+    operationsByType: {} as Record<string, number>
+  });
   
   // Modal states
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -45,10 +66,144 @@ const Caisse = () => {
     fetchCaisses();
   }, []);
 
+  // Simple fetch function without useCallback to avoid closure issues
+  const fetchOperations = async (page: number, applyFilters = false) => {
+    console.log('fetchOperations called with page:', page, 'applyFilters:', applyFilters);
+    setOperationsLoading(true);
+    try {
+      // Create filters object
+      const filters: Record<string, any> = { page };
+      
+      // Always apply caisse filter if applicable
+      if (!showAllOperations && selectedCaisse) {
+        filters.caisse = selectedCaisse.id;
+        console.log('Applying caisse filter:', selectedCaisse.id);
+      }
+      
+      // Only apply these filters when explicitly requested (via Filter button)
+      if (applyFilters) {
+        console.log('Applying additional filters');
+        
+        if (filterOperationType) {
+          filters.operation_type = filterOperationType;
+          console.log('Operation type filter:', filterOperationType);
+        }
+        
+        if (filterPerformedBy) {
+          // Send as 'search' parameter which works with the backend search fields
+          filters.search = filterPerformedBy;
+          console.log('Performed by (search) filter:', filterPerformedBy);
+        }
+        
+        if (filterDate) {
+          // Create start_date as beginning of day
+          filters.start_date = filterDate;
+          
+          // Create end_date as end of the same day (if only filtering by one day)
+          const nextDay = new Date(filterDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          filters.end_date = nextDay.toISOString().split('T')[0];
+          
+          console.log('Date range filter:', filters.start_date, 'to', filters.end_date);
+        }
+      }
+      
+      // Very important: log exactly what we're sending to help debug
+      console.log('Final API filters:', filters);
+      
+      // Make the API call
+      const response = await getCaisseOperations(page, filters);
+      console.log('API response:', response);
+      
+      if (response && response.results) {
+        setOperations(response.results);
+        setTotalOperations(response.count);
+        setCurrentPage(page);
+        setTotalPages(Math.ceil(response.count / 10));
+      } else {
+        setOperations([]);
+        setTotalOperations(0);
+        setCurrentPage(1);
+        setTotalPages(1);
+      }
+    } catch (error) {
+      console.error('Error fetching operations:', error);
+      showNotification('Failed to fetch operations', 'error');
+      setOperations([]);
+      setTotalOperations(0);
+    } finally {
+      setOperationsLoading(false);
+    }
+  };
+  
+  // Apply filters function - called directly from button click
+  const applyFilters = () => {
+    console.log('Apply filters button clicked');
+    fetchOperations(1, true); // Fetch page 1 with filters applied
+  };
+  
+  // Reset filters function
+  const resetFilters = () => {
+    console.log('Reset filters button clicked');
+    setFilterOperationType('');
+    setFilterAmountGreaterThan('');
+    setFilterAmountLessThan('');
+    setFilterPerformedBy('');
+    setFilterDate('');
+    fetchOperations(1, false); // Fetch without filters
+  };
+
+  // Only fetch when caisse/showAllOperations changes
   useEffect(() => {
-    // Initial fetch of operations when component mounts or filter options change
-    fetchOperations(1);
+    console.log('Main effect running - caisse or showAllOperations changed');
+    fetchOperations(1, false); // Don't apply extra filters on initial load
   }, [selectedCaisse, showAllOperations]);
+
+  
+  useEffect(() => {
+    // Calculate report data when operations change
+    if (operations.length > 0) {
+      calculateReportData();
+    }
+  }, [operations]);
+  
+  const calculateReportData = () => {
+    // Calculate deposits total
+    const deposits = operations.filter(op => op.operation_type === 'DEPOSIT');
+    const totalDeposits = deposits.reduce((sum, op) => sum + Number(op.amount), 0);
+    
+    // Calculate withdrawals total
+    const withdrawals = operations.filter(op => op.operation_type === 'WITHDRAWAL');
+    const totalWithdrawals = Math.abs(withdrawals.reduce((sum, op) => sum + Number(op.amount), 0));
+    
+    // Calculate today's operations
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayOperations = operations.filter(op => new Date(op.timestamp) >= today).length;
+    
+    // Calculate this week's operations
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    oneWeekAgo.setHours(0, 0, 0, 0);
+    const weeklyOperations = operations.filter(op => new Date(op.timestamp) >= oneWeekAgo).length;
+    
+    // Count operations by type
+    const operationsByType: Record<string, number> = {};
+    operations.forEach(op => {
+      if (!operationsByType[op.operation_type]) {
+        operationsByType[op.operation_type] = 0;
+      }
+      operationsByType[op.operation_type]++;
+    });
+    
+    setReportData({
+      totalDeposits,
+      totalWithdrawals,
+      todayOperations,
+      weeklyOperations,
+      operationsByType
+    });
+  };
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({
@@ -75,49 +230,6 @@ const Caisse = () => {
       showNotification('Failed to fetch cash registers', 'error');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchOperations = async (page: number) => {
-    setOperationsLoading(true);
-    try {
-      const filters: Record<string, any> = { page };
-      
-      // Handle caisse filtering based on selected caisse and toggle state
-      // When toggle is ON (showAllOperations=true) -> show all operations (don't filter by caisse)
-      // When toggle is OFF (showAllOperations=false) -> show only selected caisse operations
-      if (!showAllOperations && selectedCaisse) {
-        // Only filter by caisse when not showing all operations
-        filters.caisse = selectedCaisse.id;
-      }
-      
-      // Debugging to track what's being sent to API
-      console.log('Fetching operations with filters:', filters);
-      
-      // Make API call with explicit parameters
-      const response = await getCaisseOperations(page, filters);
-      console.log('Operations response:', response);
-      
-      if (response && response.results) {
-        setOperations(response.results);
-        setTotalOperations(response.count);
-        setCurrentPage(page);
-        setTotalPages(Math.ceil(response.count / 10)); // Assuming 10 items per page
-      } else {
-        // Handle empty or invalid response
-        setOperations([]);
-        setTotalOperations(0);
-        setCurrentPage(1);
-        setTotalPages(1);
-      }
-    } catch (error) {
-      console.error('Error fetching operations:', error);
-      showNotification('Failed to fetch operations', 'error');
-      // Reset state on error
-      setOperations([]);
-      setTotalOperations(0);
-    } finally {
-      setOperationsLoading(false);
     }
   };
 
@@ -307,59 +419,122 @@ const Caisse = () => {
             ))}
           </div>
 
-          {selectedCaisse && (
+          {/* Tabs and Filter Controls */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+            <div className="tabs tabs-boxed">
+              <button 
+                className={`tab ${activeTab === 'operations' ? 'tab-active' : ''}`}
+                onClick={() => setActiveTab('operations')}
+              >
+                Recent Operations
+              </button>
+              <button 
+                className={`tab ${activeTab === 'reports' ? 'tab-active' : ''}`}
+                onClick={() => setActiveTab('reports')}
+              >
+                Reports
+              </button>
+            </div>
+            
+            <div className="flex items-center">
+              <div className="form-control">
+                <label className="cursor-pointer label">
+                  <span className="label-text mr-2">
+                    Show all operations
+                  </span>
+                  <input 
+                    type="checkbox" 
+                    className="toggle toggle-primary" 
+                    checked={showAllOperations}
+                    onChange={(e) => {
+                      setShowAllOperations(e.target.checked);
+                      setSelectedCaisse(e.target.checked ? null : selectedCaisse);
+                      fetchOperations(1);
+                    }} 
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Content based on active tab */}
+          {activeTab === 'operations' ? (
             <div>
-              {/* Action Buttons */}
-              <div className="flex gap-4 mb-6">
-                <button className="btn btn-success" onClick={() => setIsDepositModalOpen(true)}>
-                  Add Funds
-                </button>
-                <button 
-                  className="btn btn-error" 
-                  onClick={() => setIsWithdrawalModalOpen(true)}
-                  disabled={Number(selectedCaisse.current_balance) <= 0}
-                >
-                  Withdraw Funds
-                </button>
-              </div>
-
-              {/* Tabs and Filter Controls */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-                <div className="tabs tabs-boxed">
-                  <button className="tab tab-active">Recent Operations</button>
-                  <button className="tab">Reports</button>
+              {/* Operation Filters */}
+              <form
+                className="flex flex-wrap gap-4 mb-4 items-end bg-base-200 p-4 rounded-lg"
+                onSubmit={e => {
+                  e.preventDefault();
+                  applyFilters(); // Use the new applyFilters function
+                }}
+              >
+                <div>
+                  <label className="label label-text">Type</label>
+                  <select
+                    className="select select-bordered"
+                    value={filterOperationType}
+                    onChange={e => setFilterOperationType(e.target.value)}
+                  >
+                    <option value="">All</option>
+                    <option value="DEPOSIT">Deposit</option>
+                    <option value="WITHDRAWAL">Withdrawal</option>
+                    <option value="SALE">Sale</option>
+                    <option value="PURCHASE_PAYMENT">Purchase Payment</option>
+                    <option value="ADJUSTMENT">Balance Adjustment</option>
+                  </select>
                 </div>
-                
-                <div className="flex items-center">
-                  <div className="form-control">
-                    <label className="cursor-pointer label">
-                      <span className="label-text mr-2">
-                        Show all operations
-                      </span>
-                      <input 
-                        type="checkbox" 
-                        className="toggle toggle-primary" 
-                        checked={showAllOperations}
-                        onChange={() => {
-                          const newShowAllValue = !showAllOperations;
-                          setShowAllOperations(newShowAllValue);
-                          
-                          // If turning off show all operations and we don't have a selected caisse,
-                          // select the first available caisse
-                          if (!newShowAllValue && !selectedCaisse && caisses.length > 0) {
-                            setSelectedCaisse(caisses[0]);
-                          }
-                          
-                          // Immediately fetch operations with the new filter setting
-                          fetchOperations(1);
-                        }} 
-                      />
-                    </label>
-                  </div>
+                {/* Amount filters are disabled until backend supports them
+                <div>
+                  <label className="label label-text">Amount &gt;=</label>
+                  <input
+                    type="number"
+                    className="input input-bordered"
+                    value={filterAmountGreaterThan}
+                    onChange={e => setFilterAmountGreaterThan(e.target.value)}
+                    placeholder="Min amount"
+                  />
                 </div>
-              </div>
-
-              {/* Operations Table */}
+                <div>
+                  <label className="label label-text">Amount &lt;=</label>
+                  <input
+                    type="number"
+                    className="input input-bordered"
+                    value={filterAmountLessThan}
+                    onChange={e => setFilterAmountLessThan(e.target.value)}
+                    placeholder="Max amount"
+                  />
+                </div>
+                */}
+                <div>
+                  <label className="label label-text">Performed By</label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    value={filterPerformedBy}
+                    onChange={e => setFilterPerformedBy(e.target.value)}
+                    placeholder="Username"
+                  />
+                </div>
+                <div>
+                  <label className="label label-text">Date</label>
+                  <input
+                    type="date"
+                    className="input input-bordered"
+                    value={filterDate}
+                    onChange={e => setFilterDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="btn btn-primary">Filter</button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={resetFilters} // Use the new resetFilters function
+                  >
+                    Reset
+                  </button>
+                </div>
+              </form>
               {operationsLoading ? (
                 <div className="flex justify-center py-10">
                   <span className="loading loading-spinner loading-md"></span>
@@ -369,8 +544,7 @@ const Caisse = () => {
                   <p>
                     {showAllOperations
                       ? "No operations found in any cash register"
-                      : `No operations found for ${selectedCaisse?.name}`
-                    }
+                      : `No operations found for ${selectedCaisse?.name}`}
                   </p>
                 </div>
               ) : (
@@ -407,68 +581,63 @@ const Caisse = () => {
                       </tbody>
                     </table>
                   </div>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex justify-between items-center mt-4">
-                      <span className="text-sm text-gray-600">
-                        Showing {operations.length} of {totalOperations} operations
-                        {showAllOperations 
-                          ? " across all cash registers" 
-                          : selectedCaisse ? ` for ${selectedCaisse.name}` : ""}
-                      </span>
-                      <div className="join">
-                        {/* Previous page button */}
-                        <button 
-                          className="join-item btn btn-sm"
-                          onClick={() => fetchOperations(currentPage - 1)}
-                          disabled={currentPage === 1}
-                        >
-                          «
-                        </button>
-                        
-                        {/* Page number buttons */}
-                        {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                          let pageNum;
-                          
-                          if (totalPages <= 5) {
-                            // If total pages <= 5, show all pages
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            // If near the start
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            // If near the end
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            // In the middle
-                            pageNum = currentPage - 2 + i;
-                          }
-                          
-                          return (
-                            <button 
-                              key={pageNum} 
-                              className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
-                              onClick={() => fetchOperations(pageNum)}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-                        
-                        {/* Next page button */}
-                        <button 
-                          className="join-item btn btn-sm"
-                          onClick={() => fetchOperations(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                        >
-                          »
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-between items-center mt-4">
+                  <span className="text-sm text-gray-600">
+                    Showing {operations.length} of {totalOperations} operations
+                    {showAllOperations 
+                      ? " across all cash registers" 
+                      : selectedCaisse ? ` for ${selectedCaisse.name}` : ""}
+                  </span>
+                  <div className="join">
+                    {/* Previous page button */}
+                    <button 
+                      className="join-item btn btn-sm"
+                      onClick={() => fetchOperations(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                       <FiChevronLeft />
+                    </button>
+                    {/* Page number buttons */}
+                    {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button 
+                          key={pageNum} 
+                          className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                          onClick={() => fetchOperations(pageNum)}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    {/* Next page button */}
+                    <button 
+                      className="join-item btn btn-sm"
+                      onClick={() => fetchOperations(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <FiChevronRight />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              {/* Reports tab content */}
             </div>
           )}
         </div>
@@ -479,9 +648,12 @@ const Caisse = () => {
         <div className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg">
-              Add Funds to {selectedCaisse?.name}
+              Deposit Funds into {selectedCaisse?.name}
             </h3>
             <div className="py-4">
+              <p className="mb-4">
+                Current Balance: <strong>${selectedCaisse ? Number(selectedCaisse.current_balance).toFixed(2) : '0.00'}</strong>
+              </p>
               <div className="form-control">
                 <label className="label">
                   <span className="label-text">Amount</span>
