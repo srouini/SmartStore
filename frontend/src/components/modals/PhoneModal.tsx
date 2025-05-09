@@ -3,8 +3,30 @@ import { useForm } from 'react-hook-form';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import brandService from '../../api/brandService';
+import modelService from '../../api/modelService';
 import type { Brand } from '../../api/brandService';
-import type { Phone, PhoneFormData } from '../../api/phoneService';
+import type { Model } from '../../api/modelService';
+import type { Phone } from '../../api/phoneService';
+
+// Define the PhoneFormData interface since it's not exported from phoneService
+interface PhoneFormData {
+  name: string;
+  brand?: number;
+  model?: number;
+  cost_price: number;
+  selling_unite_price: number;
+  selling_semi_bulk_price?: number;
+  selling_bulk_price?: number;
+  description?: string;
+  condition: string;
+  version: string;
+  storage_gb: number;
+  ram_gb: number;
+  color?: string;
+  phone_type: string;
+  screen_type: string;
+  photo?: FileList;
+}
 
 interface PhoneModalProps {
   isOpen: boolean;
@@ -20,15 +42,16 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
   editingPhone
 }) => {
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [models, setModels] = useState<any[]>([]);
-  const [selectedBrand, setSelectedBrand] = useState<number | null>(editingPhone?.brand?.id || null);
+  const [models, setModels] = useState<Model[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<number | null>(editingPhone?.brand || null);
   const [isLoadingBrands, setIsLoadingBrands] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<PhoneFormData>({
     defaultValues: {
       name: editingPhone?.name || '',
-      brand: editingPhone?.brand?.id || undefined,
-      model: editingPhone?.model?.id || undefined,
+      brand: editingPhone?.brand || undefined,
+      model: editingPhone?.model || undefined,
       cost_price: editingPhone?.cost_price || 0,
       selling_unite_price: editingPhone?.selling_unite_price || 0,
       selling_semi_bulk_price: editingPhone?.selling_semi_bulk_price || 0,
@@ -72,18 +95,24 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
     if (watchBrand) {
       const fetchModels = async () => {
         try {
-          // This would be replaced with your actual API call to get models for a brand
-          // const data = await modelService.getModelsByBrand(watchBrand);
-          // setModels(data);
-          
-          // For now, we're just setting an empty array
-          setModels([]);
+          setIsLoadingModels(true);
+          const data = await modelService.getModelsByBrand(watchBrand);
+          if (Array.isArray(data)) {
+            setModels(data);
+          } else if (data && typeof data === 'object' && 'results' in data) {
+            setModels(data.results);
+          }
         } catch (error) {
           console.error('Error fetching models:', error);
+          setModels([]);
+        } finally {
+          setIsLoadingModels(false);
         }
       };
 
       fetchModels();
+    } else {
+      setModels([]);
     }
   }, [watchBrand]);
 
@@ -149,15 +178,13 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
             <span className="label-text">Model</span>
           </label>
           <select
-            className="select select-bordered"
+            className={`select select-bordered ${errors.model ? 'select-error' : ''}`}
+            disabled={!watchBrand || isLoadingModels}
             {...register('model')}
-            disabled={!watchBrand || models.length === 0}
           >
             <option value="">Select a model</option>
-            {models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
+            {models.map(model => (
+              <option key={model.id} value={model.id}>{model.name}</option>
             ))}
           </select>
         </div>
