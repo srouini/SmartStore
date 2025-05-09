@@ -351,6 +351,7 @@ const Caisse = () => {
                         Showing {operations.length} of {totalOperations} operations
                       </span>
                       <div className="join">
+                        {/* Previous page button */}
                         <button 
                           className="join-item btn btn-sm"
                           onClick={() => fetchOperations(currentPage - 1)}
@@ -358,7 +359,37 @@ const Caisse = () => {
                         >
                           «
                         </button>
-                        <button className="join-item btn btn-sm">Page {currentPage}</button>
+                        
+                        {/* Page number buttons */}
+                        {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                          let pageNum;
+                          
+                          if (totalPages <= 5) {
+                            // If total pages <= 5, show all pages
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            // If near the start
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            // If near the end
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            // In the middle
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <button 
+                              key={pageNum} 
+                              className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                              onClick={() => fetchOperations(pageNum)}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                        
+                        {/* Next page button */}
                         <button 
                           className="join-item btn btn-sm"
                           onClick={() => fetchOperations(currentPage + 1)}

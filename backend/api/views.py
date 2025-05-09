@@ -13,24 +13,28 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.pagination import PageNumberPagination
 
 from .models import (
     Brand, Model, Product, Phone, Accessory, 
     Stock, Sale, SaleItem, Invoice, SALE_TYPES,
-    Purchase, PurchaseItem, PAYMENT_STATUS_CHOICES, PAYMENT_METHOD_CHOICES
+    Purchase, PurchaseItem, PAYMENT_STATUS_CHOICES, PAYMENT_METHOD_CHOICES,
+    Supplier, Caisse, CaisseOperation
 )
 from .serializers import (
     BrandSerializer, ModelSerializer, ProductSerializer,
     PhoneSerializer, AccessorySerializer, StockSerializer,
     SaleSerializer, SaleItemSerializer, InvoiceSerializer,
-    UserSerializer, RecordSaleSerializer, AddStockSerializer,
-    PurchaseSerializer, PurchaseItemSerializer, CreatePurchaseSerializer
+    RecordSaleSerializer, UserSerializer, AddStockSerializer,
+    SupplierSerializer, PurchaseSerializer, PurchaseItemSerializer,
+    CreatePurchaseSerializer, CaisseSerializer, CaisseOperationSerializer,
+    CaisseDetailSerializer, CaisseDepositSerializer, CaisseWithdrawalSerializer
 )
 import random
 import string
 
-# Import viewsets from purchase_views.py
-from .purchase_views import SupplierViewSet, PurchaseViewSet
+# Import pagination class from purchase_views.py
+from .purchase_views import SupplierViewSet, PurchaseViewSet, StandardResultsSetPagination
 
 # Authentication Views
 @method_decorator(ensure_csrf_cookie, name='dispatch')
@@ -137,13 +141,15 @@ class UserView(APIView):
 class BrandViewSet(viewsets.ModelViewSet):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
-    permission_classes = [AllowAny]  # Temporarily allow any access for testing
+    permission_classes = [AllowAny]
+    pagination_class = StandardResultsSetPagination
 
 # Model ViewSet
 class ModelViewSet(viewsets.ModelViewSet):
     queryset = Model.objects.all()
     serializer_class = ModelSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = Model.objects.all()
@@ -159,6 +165,7 @@ class PhoneViewSet(viewsets.ModelViewSet):
     queryset = Phone.objects.all()
     serializer_class = PhoneSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = Phone.objects.all()
@@ -215,6 +222,7 @@ class AccessoryViewSet(viewsets.ModelViewSet):
     queryset = Accessory.objects.all()
     serializer_class = AccessorySerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = Accessory.objects.all()
@@ -256,6 +264,7 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Stock.objects.all()
     serializer_class = StockSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = Stock.objects.all()
@@ -308,6 +317,7 @@ class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all().order_by('-sale_date')
     serializer_class = SaleSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = Sale.objects.all().order_by('-sale_date')
@@ -434,6 +444,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Invoice.objects.all().order_by('-invoice_date')
     serializer_class = InvoiceSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = Invoice.objects.all().order_by('-invoice_date')
@@ -458,4 +469,81 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         if customer_info is not None:
             queryset = queryset.filter(customer_info__icontains=customer_info)
         
+        return queryset
+
+# Caisse (Cash Register) Views
+class CaisseViewSet(viewsets.ModelViewSet):
+    queryset = Caisse.objects.all().order_by('name')
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return CaisseDetailSerializer
+        return CaisseSerializer
+    
+    @action(detail=True, methods=['post'])
+    def deposit(self, request, pk=None):
+        caisse = self.get_object()
+        serializer = CaisseDepositSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            amount = serializer.validated_data['amount']
+            description = serializer.validated_data.get('description', 'Manual deposit')
+            
+            try:
+                caisse.add_funds(amount, description, request.user)
+                return Response({
+                    'status': 'success',
+                    'message': f'Successfully added {amount} to {caisse.name}',
+                    'current_balance': caisse.current_balance
+                })
+            except ValueError as e:
+                return Response({'status': 'error', 'message': str(e)}, 
+                                status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def withdraw(self, request, pk=None):
+        caisse = self.get_object()
+        serializer = CaisseWithdrawalSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            amount = serializer.validated_data['amount']
+            description = serializer.validated_data.get('description', 'Manual withdrawal')
+            
+            try:
+                caisse.withdraw_funds(amount, description, request.user)
+                return Response({
+                    'status': 'success',
+                    'message': f'Successfully withdrew {amount} from {caisse.name}',
+                    'current_balance': caisse.current_balance
+                })
+            except ValueError as e:
+                return Response({'status': 'error', 'message': str(e)}, 
+                                status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CaisseOperationViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = CaisseOperation.objects.all().order_by('-timestamp')
+    serializer_class = CaisseOperationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filterset_fields = ['caisse', 'operation_type', 'performed_by']
+    search_fields = ['description', 'reference_id']
+    
+    def get_queryset(self):
+        queryset = self.queryset
+        
+        # Filter by date range if provided
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        
+        if start_date:
+            queryset = queryset.filter(timestamp__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(timestamp__lte=end_date)
+            
         return queryset
