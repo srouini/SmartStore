@@ -10,6 +10,8 @@ router.register(r'accessories', views.AccessoryViewSet)
 router.register(r'stock', views.StockViewSet)
 router.register(r'sales', views.SaleViewSet)
 router.register(r'invoices', views.InvoiceViewSet)
+router.register(r'suppliers', views.SupplierViewSet)
+router.register(r'purchases', views.PurchaseViewSet)
 
 urlpatterns = [
     # Authentication endpoints

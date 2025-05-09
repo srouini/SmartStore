@@ -16,16 +16,21 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .models import (
     Brand, Model, Product, Phone, Accessory, 
-    Stock, Sale, SaleItem, Invoice, SALE_TYPES
+    Stock, Sale, SaleItem, Invoice, SALE_TYPES,
+    Purchase, PurchaseItem, PAYMENT_STATUS_CHOICES, PAYMENT_METHOD_CHOICES
 )
 from .serializers import (
     BrandSerializer, ModelSerializer, ProductSerializer,
     PhoneSerializer, AccessorySerializer, StockSerializer,
     SaleSerializer, SaleItemSerializer, InvoiceSerializer,
-    UserSerializer, RecordSaleSerializer, AddStockSerializer
+    UserSerializer, RecordSaleSerializer, AddStockSerializer,
+    PurchaseSerializer, PurchaseItemSerializer, CreatePurchaseSerializer
 )
 import random
 import string
+
+# Import viewsets from purchase_views.py
+from .purchase_views import SupplierViewSet, PurchaseViewSet
 
 # Authentication Views
 @method_decorator(ensure_csrf_cookie, name='dispatch')

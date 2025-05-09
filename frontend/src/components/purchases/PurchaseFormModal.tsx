@@ -114,7 +114,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           <Button onClick={handleSubmit(onSubmit)}>Save</Button>
         </>
       }
-      size="xl"
+      size="4xl"
     >
       <form className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

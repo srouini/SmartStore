@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     Brand, Model, Product, Phone, Accessory, 
-    Stock, Sale, SaleItem, Invoice, SALE_TYPES
+    Stock, Sale, SaleItem, Invoice, SALE_TYPES,
+    Supplier, Purchase, PurchaseItem, PAYMENT_STATUS_CHOICES, PAYMENT_METHOD_CHOICES
 )
 
 # User Serializer
@@ -212,3 +213,97 @@ class AddStockSerializer(serializers.Serializer):
             return value
         except Product.DoesNotExist:
             raise serializers.ValidationError("Product does not exist")
+
+# Supplier Serializer
+class SupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Supplier
+        fields = '__all__'
+
+# PurchaseItem Serializer
+class PurchaseItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseItem
+        fields = '__all__'
+
+# Purchase Serializer
+class PurchaseSerializer(serializers.ModelSerializer):
+    items = PurchaseItemSerializer(many=True, read_only=True)
+    payment_status_display = serializers.ReadOnlyField()
+    payment_method_display = serializers.ReadOnlyField()
+    supplier_details = SupplierSerializer(source='supplier', read_only=True)
+    
+    class Meta:
+        model = Purchase
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')
+
+# Serializer for creating a purchase with multiple items
+class CreatePurchaseSerializer(serializers.Serializer):
+    supplier_id = serializers.IntegerField()
+    reference_number = serializers.CharField(max_length=100)
+    date = serializers.DateField()
+    payment_status = serializers.ChoiceField(choices=PAYMENT_STATUS_CHOICES, default='PENDING')
+    payment_method = serializers.ChoiceField(choices=PAYMENT_METHOD_CHOICES, default='CASH')
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    soumis_tva = serializers.BooleanField(default=True)
+    items = serializers.ListField(
+        child=serializers.DictField(
+            child=serializers.CharField(),
+            allow_empty=False
+        ),
+        allow_empty=False
+    )
+    
+    def validate_supplier_id(self, value):
+        try:
+            Supplier.objects.get(pk=value)
+            return value
+        except Supplier.DoesNotExist:
+            raise serializers.ValidationError("Supplier does not exist")
+    
+    def validate_reference_number(self, value):
+        # Check if reference number already exists
+        if Purchase.objects.filter(reference_number=value).exists():
+            raise serializers.ValidationError("A purchase with this reference number already exists")
+        return value
+    
+    def validate_items(self, items):
+        validated_items = []
+        
+        for item in items:
+            # Validate required fields
+            required_fields = ['product_id', 'product_name', 'quantity', 'unit_price']
+            for field in required_fields:
+                if field not in item:
+                    raise serializers.ValidationError(f"Each item must have {field}")
+            
+            try:
+                product_id = int(item['product_id'])
+                product_name = item['product_name']
+                product_code = item.get('product_code', '')
+                quantity = int(item['quantity'])
+                unit_price = float(item['unit_price'])
+                discount = float(item.get('discount', 0))
+            except (ValueError, TypeError):
+                raise serializers.ValidationError("Invalid data types in item fields")
+            
+            if quantity <= 0:
+                raise serializers.ValidationError("Quantity must be greater than zero")
+            
+            if unit_price < 0:
+                raise serializers.ValidationError("Unit price cannot be negative")
+                
+            if discount < 0:
+                raise serializers.ValidationError("Discount cannot be negative")
+            
+            validated_items.append({
+                'product_id': product_id,
+                'product_name': product_name,
+                'product_code': product_code,
+                'quantity': quantity,
+                'unit_price': unit_price,
+                'discount': discount
+            })
+        
+        return validated_items

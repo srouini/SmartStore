@@ -248,3 +248,136 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f"Invoice #{self.invoice_number} for Sale #{self.sale.id}"
+
+# --- Supplier Model ---
+class Supplier(models.Model):
+    name = models.CharField(max_length=255)
+    address = models.CharField(max_length=500, blank=True, null=True)
+    email = models.EmailField(max_length=254, blank=True, null=True)
+    tel = models.CharField(max_length=20, blank=True, null=True)
+    code = models.CharField(max_length=50, blank=True, null=True)
+    RC = models.CharField(max_length=50, blank=True, null=True)
+    NIF = models.CharField(max_length=50, blank=True, null=True)
+    AI = models.CharField(max_length=50, blank=True, null=True)
+    NIS = models.CharField(max_length=50, blank=True, null=True)
+    soumis_tva = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return self.name
+
+# --- Purchase Model ---
+PAYMENT_STATUS_CHOICES = (
+    ('PENDING', 'Pending'),
+    ('PARTIAL', 'Partial'),
+    ('PAID', 'Paid'),
+    ('CANCELLED', 'Cancelled'),
+)
+
+PAYMENT_METHOD_CHOICES = (
+    ('CASH', 'Cash'),
+    ('CREDIT_CARD', 'Credit Card'),
+    ('DEBIT_CARD', 'Debit Card'),
+    ('BANK_TRANSFER', 'Bank Transfer'),
+    ('CHECK', 'Check'),
+    ('MOBILE_PAYMENT', 'Mobile Payment'),
+    ('OTHER', 'Other'),
+)
+
+class Purchase(models.Model):
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='purchases')
+    reference_number = models.CharField(max_length=100, unique=True)
+    date = models.DateField()
+    ht = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tva = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    ttc = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='PENDING')
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='CASH')
+    notes = models.TextField(blank=True, null=True)
+    soumis_tva = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def update_totals(self):
+        """Update the purchase totals based on its items"""
+        from decimal import Decimal
+        
+        # Calculate totals from items
+        items = self.items.all()
+        total_ht = sum(item.ht for item in items)
+        total_tva = sum(item.tva for item in items) if self.soumis_tva else Decimal('0.00')
+        
+        # Apply purchase-level discount if any
+        if self.discount > 0:
+            if self.discount <= 100:
+                # Percentage discount
+                discount_amount = (total_ht * self.discount) / 100
+                self.ht = total_ht - discount_amount
+            else:
+                # Absolute discount
+                self.ht = total_ht - self.discount
+        else:
+            self.ht = total_ht
+        
+        # Calculate TVA and TTC
+        if self.soumis_tva:
+            self.tva = total_tva
+        else:
+            self.tva = Decimal('0.00')
+            
+        self.ttc = self.ht + self.tva
+        self.save()
+    
+    def __str__(self):
+        return f"Purchase #{self.id} - {self.reference_number} from {self.supplier.name}"
+    
+    @property
+    def payment_status_display(self):
+        return dict(PAYMENT_STATUS_CHOICES).get(self.payment_status, self.payment_status)
+    
+    @property
+    def payment_method_display(self):
+        return dict(PAYMENT_METHOD_CHOICES).get(self.payment_method, self.payment_method)
+
+# --- PurchaseItem Model ---
+class PurchaseItem(models.Model):
+    purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='items')
+    product_id = models.PositiveIntegerField()
+    product_name = models.CharField(max_length=255)  # Store name at time of purchase
+    product_code = models.CharField(max_length=20, blank=True, null=True)  # Store code at time of purchase
+    quantity = models.PositiveIntegerField()
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    ht = models.DecimalField(max_digits=10, decimal_places=2)
+    tva = models.DecimalField(max_digits=10, decimal_places=2)
+    ttc = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    def save(self, *args, **kwargs):
+        # Calculate HT (Hors Taxe) based on discount
+        base_amount = self.quantity * self.unit_price
+        
+        # Apply discount based on its value
+        if self.discount > 0:
+            if self.discount <= 100:  # Percentage discount
+                discount_amount = (base_amount * self.discount) / 100
+                self.ht = base_amount - discount_amount
+            else:  # Absolute discount
+                self.ht = base_amount - self.discount
+        else:
+            self.ht = base_amount
+        
+        # Calculate TVA (Tax) based on purchase.soumis_tva
+        if self.purchase.soumis_tva:
+            self.tva = self.ht * 0.19  # 19% TVA
+        else:
+            self.tva = 0
+        
+        # Calculate TTC (Total with Tax)
+        self.ttc = self.ht + self.tva
+        
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.quantity} x {self.product_name} in Purchase #{self.purchase.id}"

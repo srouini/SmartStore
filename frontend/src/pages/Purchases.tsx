@@ -281,11 +281,11 @@ const Purchases: React.FC = () => {
           </select>
         </div>
 
-        <div className="form-control w-full max-w-xs">
+        <div className="form-control">
           <label className="label">
             <span className="label-text">Filter by Date Range</span>
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 m-r-20">
             <input 
               type="date" 
               className="input input-bordered w-full" 

@@ -370,7 +370,7 @@ const Sales: React.FC = () => {
           </select>
         </div>
 
-        <div className="form-control w-full max-w-xs">
+        <div className="form-control">
           <label className="label">
             <span className="label-text">Filter by Date Range</span>
           </label>
@@ -396,8 +396,7 @@ const Sales: React.FC = () => {
             </Button>
           </div>
         </div>
-
-        <div className="form-control w-full max-w-xs">
+        <div className="form-control">
           <label className="label">
             <span className="label-text">Search by Customer</span>
           </label>
