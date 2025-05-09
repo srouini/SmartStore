@@ -36,6 +36,7 @@ const Navbar: React.FC = () => {
               <li><Link to="/accessories" onClick={() => setIsMenuOpen(false)}>Accessories</Link></li>
               <li><Link to="/brands" onClick={() => setIsMenuOpen(false)}>Brands</Link></li>
               <li><Link to="/models" onClick={() => setIsMenuOpen(false)}>Models</Link></li>
+              <li><Link to="/suppliers" onClick={() => setIsMenuOpen(false)}>Suppliers</Link></li>
               <li><Link to="/purchases" onClick={() => setIsMenuOpen(false)}>Purchases</Link></li>
               <li><Link to="/sales" onClick={() => setIsMenuOpen(false)}>Sales</Link></li>
             </ul>
@@ -49,6 +50,7 @@ const Navbar: React.FC = () => {
           <li><Link to="/accessories">Accessories</Link></li>
           <li><Link to="/brands">Brands</Link></li>
           <li><Link to="/models">Models</Link></li>
+          <li><Link to="/suppliers">Suppliers</Link></li>
           <li><Link to="/purchases">Purchases</Link></li>
           <li><Link to="/sales">Sales</Link></li>
         </ul>

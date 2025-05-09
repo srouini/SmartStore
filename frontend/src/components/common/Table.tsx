@@ -45,8 +45,12 @@ const Table: React.FC<TableProps> = ({ columns, data, isLoading = false, onRowCl
 
   if (tableData.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">No data available</p>
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="text-6xl mb-4">📋</div>
+        <h2 className="text-2xl font-bold mb-2">No Data Found</h2>
+        <p className="text-gray-500 text-center max-w-md mb-6">
+          No records are currently available. Use the "Add" button to create a new entry.
+        </p>
       </div>
     );
   }

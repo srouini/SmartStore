@@ -9,6 +9,7 @@ import Accessories from './pages/Accessories';
 import Brands from './pages/Brands';
 import Models from './pages/Models';
 import Purchases from './pages/Purchases';
+import Suppliers from './pages/Suppliers';
 import Sales from './pages/Sales';
 
 // Import CSS
@@ -32,6 +33,7 @@ function App() {
                 <Route path="/brands" element={<Brands />} />
                 <Route path="/models" element={<Models />} />
                 <Route path="/purchases" element={<Purchases />} />
+                <Route path="/suppliers" element={<Suppliers />} />
                 <Route path="/sales" element={<Sales />} />
               </Route>
             </Route>

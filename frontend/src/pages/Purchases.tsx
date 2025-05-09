@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import purchaseService from '../api/purchaseService';
-import type { Purchase } from '../api/purchaseService';
+import type { Purchase, Supplier } from '../api/purchaseService';
+import supplierService from '../api/supplierService';
 import phoneService from '../api/phoneService';
 import type { Phone } from '../api/phoneService';
 import accessoryService from '../api/accessoryService';
@@ -16,11 +17,13 @@ const Purchases: React.FC = () => {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [phones, setPhones] = useState<Phone[]>([]);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   
   // Ensure arrays are always arrays
   const ensuredPurchases = Array.isArray(purchases) ? purchases : [];
   const ensuredPhones = Array.isArray(phones) ? phones : [];
   const ensuredAccessories = Array.isArray(accessories) ? accessories : [];
+  const ensuredSuppliers = Array.isArray(suppliers) ? suppliers : [];
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -53,6 +56,14 @@ const Purchases: React.FC = () => {
   const watchItems = watch('items');
   const watchProductTypes = watchItems?.map((item: any) => item.product_type);
 
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchPurchases();
+    fetchPhones();
+    fetchAccessories();
+    fetchSuppliers();
+  }, []);
+
   // Payment status options
   const paymentStatusOptions = [
     { value: 'PENDING', label: 'Pending' },
@@ -71,13 +82,6 @@ const Purchases: React.FC = () => {
     { value: 'MOBILE_PAYMENT', label: 'Mobile Payment' },
     { value: 'OTHER', label: 'Other' }
   ];
-
-  // Fetch purchases, phones, and accessories on component mount
-  useEffect(() => {
-    fetchPurchases();
-    fetchPhones();
-    fetchAccessories();
-  }, []);
 
   const fetchPurchases = async (params?: Record<string, any>) => {
     try {
@@ -111,17 +115,27 @@ const Purchases: React.FC = () => {
     }
   };
 
+  const fetchSuppliers = async () => {
+    try {
+      const data = await supplierService.getAllSuppliers();
+      setSuppliers(data);
+    } catch (err: any) {
+      console.error('Error fetching suppliers:', err);
+    }
+  };
+
   const handleCreatePurchase = () => {
     setEditingPurchase(null);
     reset({
-      supplier_name: '',
-      supplier_contact: '',
+      supplier_id: '',
       reference_number: '',
       date: format(new Date(), 'yyyy-MM-dd'),
       payment_status: 'PENDING',
       payment_method: 'CASH',
       notes: '',
-      items: [{ product_type: 'PHONE', product_id: '', quantity: 1, unit_price: 0 }]
+      soumis_tva: true,
+      discount: 0,
+      items: [{ product_type: 'PHONE', product_id: '', quantity: 1, unit_price: 0, discount: 0 }]
     });
     setIsModalOpen(true);
   };
@@ -131,20 +145,22 @@ const Purchases: React.FC = () => {
     
     // Format items for the form
     const formattedItems = purchase.items.map(item => ({
-      product_type: item.product_type,
       product_id: item.product_id,
+      product_name: item.product_name,
       quantity: item.quantity,
-      unit_price: item.unit_price
+      unit_price: item.unit_price,
+      discount: item.discount || 0
     }));
     
     reset({
-      supplier_name: purchase.supplier_name,
-      supplier_contact: purchase.supplier_contact,
+      supplier_id: purchase.supplier || '',
       reference_number: purchase.reference_number,
       date: purchase.date,
       payment_status: purchase.payment_status,
       payment_method: purchase.payment_method,
       notes: purchase.notes || '',
+      soumis_tva: purchase.soumis_tva !== undefined ? purchase.soumis_tva : true,
+      discount: purchase.discount || 0,
       items: formattedItems
     });
     
@@ -248,8 +264,9 @@ const Purchases: React.FC = () => {
     }
   };
 
-  const handleAddItem = () => {
-    append({ product_type: 'PHONE', product_id: '', quantity: 1, unit_price: 0 });
+  const handleAddItem = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    append({ product_type: 'PHONE', product_id: '', quantity: 1, unit_price: 0, discount: 0 });
   };
 
   const handleRemoveItem = (index: number) => {
@@ -498,29 +515,27 @@ const Purchases: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Supplier Name*</span>
+                <span className="label-text">Supplier*</span>
               </label>
-              <input
-                type="text"
-                className={`input input-bordered ${errors.supplier_name ? 'input-error' : ''}`}
-                {...register('supplier_name', { required: 'Supplier name is required' })}
-              />
-              {errors.supplier_name && (
+              <select
+                className={`select select-bordered ${errors.supplier_id ? 'select-error' : ''}`}
+                {...register('supplier_id', { required: 'Supplier is required' })}
+              >
+                <option value="">Select a supplier</option>
+                {ensuredSuppliers.map(supplier => (
+                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                ))}
+              </select>
+              {errors.supplier_id && (
                 <label className="label">
-                  <span className="label-text-alt text-error">{String(errors.supplier_name.message)}</span>
+                  <span className="label-text-alt text-error">{String(errors.supplier_id.message)}</span>
                 </label>
               )}
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Supplier Contact</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                {...register('supplier_contact')}
-              />
+              <div className="mt-2 text-right">
+                <a href="/suppliers" target="_blank" className="text-sm text-primary hover:underline">
+                  Manage Suppliers
+                </a>
+              </div>
             </div>
 
             <div className="form-control">
@@ -581,6 +596,43 @@ const Purchases: React.FC = () => {
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
+              {errors.payment_method && (
+                <label className="label">
+                  <span className="label-text-alt text-error">{String(errors.payment_method.message)}</span>
+                </label>
+              )}
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Soumis TVA</span>
+              </label>
+              <div className="flex items-center mt-2">
+                <input
+                  type="checkbox"
+                  className="checkbox"
+                  {...register('soumis_tva')}
+                />
+                <span className="ml-2">Apply TVA to this purchase</span>
+              </div>
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Discount</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                className={`input input-bordered ${errors.discount ? 'input-error' : ''}`}
+                {...register('discount', { 
+                  valueAsNumber: true,
+                  validate: value => (value >= 0) || 'Must be non-negative'
+                })}
+              />
+              <label className="label">
+                <span className="label-text-alt">Enter percentage (1-100) or absolute amount (greater than 100)</span>
+              </label>
             </div>
 
             <div className="form-control md:col-span-2">
@@ -600,7 +652,7 @@ const Purchases: React.FC = () => {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Items</h3>
-              <Button size="sm" onClick={handleAddItem}>Add Item</Button>
+              <Button type="button" size="sm" onClick={handleAddItem}>Add Item</Button>
             </div>
 
             {fields.map((field, index) => (
@@ -767,6 +819,15 @@ const Purchases: React.FC = () => {
             </div>
           </div>
         )}
+        {ensuredPurchases.length === 0 && !isLoading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="text-6xl mb-4">📋</div>
+            <h2 className="text-2xl font-bold mb-2">No Purchases Found</h2>
+            <p className="text-gray-500 text-center max-w-md mb-6">
+              You haven't created any purchases yet. Click the "Add Purchase" button to create your first purchase.
+            </p>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );
