@@ -9,6 +9,7 @@ export interface SaleItem {
   product_type: string;
   quantity_sold: number;
   price_per_item: number;
+  discount?: number;
 }
 
 export interface Sale {
@@ -27,6 +28,7 @@ export interface Sale {
 export interface RecordSaleItem {
   product_id: number;
   quantity: number;
+  discount?: number;
 }
 
 export interface RecordSaleRequest {
