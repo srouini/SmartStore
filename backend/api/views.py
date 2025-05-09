@@ -537,6 +537,12 @@ class CaisseOperationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = self.queryset
         
+        # Explicitly check for caisse filter to ensure it works
+        caisse_id = self.request.query_params.get('caisse', None)
+        if caisse_id:
+            print(f"Filtering operations by caisse_id: {caisse_id}")
+            queryset = queryset.filter(caisse_id=caisse_id)
+        
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
@@ -545,5 +551,6 @@ class CaisseOperationViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(timestamp__gte=start_date)
         if end_date:
             queryset = queryset.filter(timestamp__lte=end_date)
-            
+        
+        print(f"CaisseOperation query: {queryset.query}")
         return queryset

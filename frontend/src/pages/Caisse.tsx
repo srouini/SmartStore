@@ -5,6 +5,7 @@ import { Caisse as CaisseType, CaisseOperation, PaginatedResponse } from '../typ
 const Caisse = () => {
   const [caisses, setCaisses] = useState<CaisseType[]>([]);
   const [selectedCaisse, setSelectedCaisse] = useState<CaisseType | null>(null);
+  const [showAllOperations, setShowAllOperations] = useState<boolean>(false);
   const [operations, setOperations] = useState<CaisseOperation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [operationsLoading, setOperationsLoading] = useState(false);
@@ -45,10 +46,9 @@ const Caisse = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedCaisse) {
-      fetchOperations(1);
-    }
-  }, [selectedCaisse]);
+    // Initial fetch of operations when component mounts or filter options change
+    fetchOperations(1);
+  }, [selectedCaisse, showAllOperations]);
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({
@@ -79,18 +79,41 @@ const Caisse = () => {
   };
 
   const fetchOperations = async (page: number) => {
-    if (!selectedCaisse) return;
-
     setOperationsLoading(true);
     try {
-      const response = await getCaisseOperations(page, { caisse: selectedCaisse.id });
-      setOperations(response.results);
-      setTotalOperations(response.count);
-      setCurrentPage(page);
-      setTotalPages(Math.ceil(response.count / 10)); // Assuming 10 items per page
+      const filters: Record<string, any> = { page };
+      
+      // Handle caisse filtering based on selected caisse
+      if (selectedCaisse) {
+        // Explicitly set caisse ID as a parameter
+        filters.caisse = selectedCaisse.id;
+      }
+      
+      // Debugging to track what's being sent to API
+      console.log('Fetching operations with filters:', filters);
+      
+      // Make API call with explicit parameters
+      const response = await getCaisseOperations(page, filters);
+      console.log('Operations response:', response);
+      
+      if (response && response.results) {
+        setOperations(response.results);
+        setTotalOperations(response.count);
+        setCurrentPage(page);
+        setTotalPages(Math.ceil(response.count / 10)); // Assuming 10 items per page
+      } else {
+        // Handle empty or invalid response
+        setOperations([]);
+        setTotalOperations(0);
+        setCurrentPage(1);
+        setTotalPages(1);
+      }
     } catch (error) {
       console.error('Error fetching operations:', error);
       showNotification('Failed to fetch operations', 'error');
+      // Reset state on error
+      setOperations([]);
+      setTotalOperations(0);
     } finally {
       setOperationsLoading(false);
     }
@@ -294,10 +317,72 @@ const Caisse = () => {
                 </button>
               </div>
 
-              {/* Tabs */}
-              <div className="tabs tabs-boxed mb-4">
-                <button className="tab tab-active">Recent Operations</button>
-                <button className="tab">Reports</button>
+              {/* Tabs and Filter Controls */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <div className="tabs tabs-boxed">
+                  <button className="tab tab-active">Recent Operations</button>
+                  <button className="tab">Reports</button>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-2 items-center">
+                  <div className="form-control">
+                    <label className="cursor-pointer label">
+                      <span className="label-text mr-2">Show all operations</span>
+                      <input 
+                        type="checkbox" 
+                        className="toggle toggle-primary" 
+                        checked={showAllOperations}
+                        onChange={() => {
+                          const newShowAllValue = !showAllOperations;
+                          setShowAllOperations(newShowAllValue);
+                          
+                          // If turning off show all operations, ensure we have a selected caisse
+                          if (showAllOperations && !selectedCaisse && caisses.length > 0) {
+                            setSelectedCaisse(caisses[0]);
+                          }
+                          
+                          // Force fetch operations after state update
+                          setTimeout(() => fetchOperations(1), 10);
+                        }} 
+                      />
+                    </label>
+                  </div>
+                  
+                  {/* Always show the dropdown, but with different options/behavior based on mode */}
+                  <div className="form-control">
+                    <select 
+                      className="select select-bordered w-full max-w-xs" 
+                      onChange={(e) => {
+                        const caisseId = e.target.value;
+                        
+                        // Clear any previous errors
+                        setTimeout(() => {
+                          if (caisseId === "all") {
+                            // Set selectedCaisse to null and force refresh operations
+                            setSelectedCaisse(null);
+                            setTimeout(() => fetchOperations(1), 0);
+                          } else {
+                            const caisse = caisses.find(c => c.id.toString() === caisseId);
+                            if (caisse) {
+                              // Set the selected caisse and force refresh operations
+                              setSelectedCaisse(caisse);
+                              setTimeout(() => fetchOperations(1), 0);
+                            }
+                          }
+                        }, 0);
+                      }}
+                      value={selectedCaisse ? selectedCaisse.id.toString() : "all"}
+                      disabled={!showAllOperations && caisses.length <= 1}
+                    >
+                      {showAllOperations && <option value="all">All Cash Registers</option>}
+                      {caisses.map(caisse => (
+                        <option key={caisse.id} value={caisse.id.toString()}>
+                          {caisse.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Operations Table */}
@@ -307,7 +392,12 @@ const Caisse = () => {
                 </div>
               ) : operations.length === 0 ? (
                 <div className="bg-base-200 p-10 text-center rounded-lg">
-                  <p>No operations found for this cash register</p>
+                  <p>
+                    {showAllOperations
+                      ? "No operations found in any cash register"
+                      : `No operations found for ${selectedCaisse?.name}`
+                    }
+                  </p>
                 </div>
               ) : (
                 <div>
@@ -349,6 +439,9 @@ const Caisse = () => {
                     <div className="flex justify-between items-center mt-4">
                       <span className="text-sm text-gray-600">
                         Showing {operations.length} of {totalOperations} operations
+                        {showAllOperations 
+                          ? " across all cash registers" 
+                          : selectedCaisse ? ` for ${selectedCaisse.name}` : ""}
                       </span>
                       <div className="join">
                         {/* Previous page button */}
