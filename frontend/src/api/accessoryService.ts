@@ -1,4 +1,5 @@
 import api from './axios';
+import { PaginatedResponse } from '../types/pagination';
 
 export interface Accessory {
   id: number;
@@ -42,7 +43,7 @@ const accessoryService = {
   // Get all accessories
   getAllAccessories: async (params?: Record<string, any>) => {
     try {
-      const response = await api.get('accessories/', { params });
+      const response = await api.get<PaginatedResponse<Accessory>>('accessories/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -98,9 +99,12 @@ const accessoryService = {
   },
 
   // Search accessories by code
-  searchByCode: async (code: string) => {
+  searchByCode: async (code: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`accessories/?code=${code}`);
+      const params: Record<string, any> = { code };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      const response = await api.get<PaginatedResponse<Accessory>>('accessories/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -108,9 +112,12 @@ const accessoryService = {
   },
 
   // Search accessories by name
-  searchByName: async (name: string) => {
+  searchByName: async (name: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`accessories/?name=${name}`);
+      const params: Record<string, any> = { name };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      const response = await api.get<PaginatedResponse<Accessory>>('accessories/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -118,9 +125,12 @@ const accessoryService = {
   },
 
   // Get accessories by category
-  getByCategory: async (category: string) => {
+  getByCategory: async (category: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`accessories/?category=${category}`);
+      const params: Record<string, any> = { category };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      const response = await api.get<PaginatedResponse<Accessory>>('accessories/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -128,9 +138,12 @@ const accessoryService = {
   },
 
   // Get accessories compatible with a specific phone
-  getCompatibleWithPhone: async (phoneId: number) => {
+  getCompatibleWithPhone: async (phoneId: number, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`accessories/?compatible_with=${phoneId}`);
+      const params: Record<string, any> = { compatible_with: phoneId };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      const response = await api.get<PaginatedResponse<Accessory>>('accessories/', { params });
       return response.data;
     } catch (error) {
       throw error;

@@ -10,6 +10,7 @@ import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import { useForm } from 'react-hook-form';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 const Phones: React.FC = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
@@ -19,6 +20,15 @@ const Phones: React.FC = () => {
   // Ensure brands and models are always arrays
   const ensuredBrands = Array.isArray(brands) ? brands : [];
   const ensuredModels = Array.isArray(models) ? models : [];
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<Phone | null>(null);
@@ -34,6 +44,13 @@ const Phones: React.FC = () => {
     fetchBrands();
     fetchModels();
   }, []);
+
+  // Effect to refetch when page changes
+  useEffect(() => {
+    if (!isLoading) {
+      fetchPhones();
+    }
+  }, [currentPage, pageSize]);
 
   // We no longer need to filter models based on brand as we're showing all models
   // and letting the user select directly from the full list
@@ -60,12 +77,35 @@ const Phones: React.FC = () => {
   const fetchPhones = async (params?: Record<string, any>) => {
     try {
       setIsLoading(true);
-      const data = await phoneService.getAllPhones(params);
-      setPhones(data);
+      
+      // Add pagination parameters
+      const paginationParams = {
+        ...params,
+        page: currentPage,
+        page_size: pageSize
+      };
+      
+      const data = await phoneService.getAllPhones(paginationParams);
+      
+      // Handle paginated response if available
+      if (data && typeof data === 'object' && 'results' in data) {
+        setPhones(data.results);
+        setTotalItems(data.count);
+        setHasNextPage(!!data.next);
+        setHasPrevPage(!!data.previous);
+        setTotalPages(Math.ceil(data.count / pageSize));
+      } else {
+        // Fallback for non-paginated response
+        setPhones(Array.isArray(data) ? data : []);
+        setTotalItems(Array.isArray(data) ? data.length : 0);
+        setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+      }
+      
       setError(null);
     } catch (err: any) {
       console.error('Error fetching phones:', err);
       setError('Failed to load phones. Please try again.');
+      setPhones([]);
     } finally {
       setIsLoading(false);
     }
@@ -188,40 +228,94 @@ const Phones: React.FC = () => {
       return;
     }
     
+    setIsLoading(true);
+    setCurrentPage(1); // Reset to first page on new search
+    
     // Determine if search query is a code or name
     if (/^[A-Z0-9-]+$/.test(searchQuery)) {
       // Looks like a code
-      phoneService.searchByCode(searchQuery)
+      phoneService.searchByCode(searchQuery, currentPage, pageSize)
         .then(data => {
-          setPhones(data);
+          if (data && typeof data === 'object' && 'results' in data) {
+            setPhones(data.results);
+            setTotalItems(data.count);
+            setHasNextPage(!!data.next);
+            setHasPrevPage(!!data.previous);
+            setTotalPages(Math.ceil(data.count / pageSize));
+          } else {
+            // Fallback for non-paginated response
+            setPhones(Array.isArray(data) ? data : []);
+            setTotalItems(Array.isArray(data) ? data.length : 0);
+            setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+          }
           setError(null);
         })
         .catch(err => {
           console.error('Error searching phones by code:', err);
           setError('Search failed. Please try again.');
-        });
+          setPhones([]);
+        })
+        .finally(() => setIsLoading(false));
     } else {
       // Assume it's a name
-      phoneService.searchByName(searchQuery)
+      phoneService.searchByName(searchQuery, currentPage, pageSize)
         .then(data => {
-          setPhones(data);
+          if (data && typeof data === 'object' && 'results' in data) {
+            setPhones(data.results);
+            setTotalItems(data.count);
+            setHasNextPage(!!data.next);
+            setHasPrevPage(!!data.previous);
+            setTotalPages(Math.ceil(data.count / pageSize));
+          } else {
+            // Fallback for non-paginated response
+            setPhones(Array.isArray(data) ? data : []);
+            setTotalItems(Array.isArray(data) ? data.length : 0);
+            setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+          }
           setError(null);
         })
         .catch(err => {
           console.error('Error searching phones by name:', err);
           setError('Search failed. Please try again.');
-        });
+          setPhones([]);
+        })
+        .finally(() => setIsLoading(false));
     }
   };
-
+  
   const handleBrandFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     const brandId = value ? parseInt(value) : null;
     setSelectedBrand(brandId);
+    setCurrentPage(1); // Reset to first page on filter change
     
     if (brandId) {
-      fetchPhones({ brand_id: brandId });
+      // Filter phones by brand
+      setIsLoading(true);
+      phoneService.getByBrand(brandId, currentPage, pageSize)
+        .then(data => {
+          if (data && typeof data === 'object' && 'results' in data) {
+            setPhones(data.results);
+            setTotalItems(data.count);
+            setHasNextPage(!!data.next);
+            setHasPrevPage(!!data.previous);
+            setTotalPages(Math.ceil(data.count / pageSize));
+          } else {
+            // Fallback for non-paginated response
+            setPhones(Array.isArray(data) ? data : []);
+            setTotalItems(Array.isArray(data) ? data.length : 0);
+            setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+          }
+          setError(null);
+        })
+        .catch(err => {
+          console.error('Error filtering phones by brand:', err);
+          setError('Failed to filter phones. Please try again.');
+          setPhones([]);
+        })
+        .finally(() => setIsLoading(false));
     } else {
+      // Reset to show all phones
       fetchPhones();
     }
   };
@@ -336,12 +430,67 @@ const Phones: React.FC = () => {
       </div>
 
       <Card>
-        <Table 
-          columns={columns} 
-          data={phones} 
-          isLoading={isLoading} 
+        <Table
+          columns={columns}
+          data={phones}
+          isLoading={isLoading}
           onRowClick={handleEditPhone}
         />
+        
+        {/* Server-side Pagination */}
+        {totalItems > 0 && (
+          <div className="flex justify-between items-center mt-6 px-4 py-3">
+            <div className="text-sm text-base-content/70">
+              Showing {phones.length} of {totalItems} phones
+            </div>
+            <div className="join">
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={!hasPrevPage}
+              >
+                <FiChevronLeft />
+              </button>
+              
+              {/* Generate page buttons */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Calculate which page numbers to show
+                let pageNum;
+                if (totalPages <= 5) {
+                  // If 5 or fewer pages, show all
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  // If near the start
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  // If near the end
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  // In the middle
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button 
+                    key={pageNum} 
+                    className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={!hasNextPage}
+              >
+                <FiChevronRight />
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Modal

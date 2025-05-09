@@ -1,4 +1,5 @@
 import api from './axios';
+import { PaginatedResponse } from '../types/pagination';
 
 export interface Brand {
   id: number;
@@ -11,9 +12,22 @@ export interface Brand {
 
 const brandService = {
   // Get all brands
-  getAllBrands: async () => {
+  getAllBrands: async (params?: Record<string, any>) => {
     try {
-      const response = await api.get('brands/');
+      const response = await api.get<PaginatedResponse<Brand>>('brands/', { params });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  
+  // Search brands by name
+  searchByName: async (name: string, page?: number, pageSize?: number) => {
+    try {
+      const params: Record<string, any> = { name };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      const response = await api.get<PaginatedResponse<Brand>>('brands/', { params });
       return response.data;
     } catch (error) {
       throw error;

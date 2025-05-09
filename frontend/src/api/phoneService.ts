@@ -1,4 +1,5 @@
 import api from './axios';
+import { PaginatedResponse } from './supplierService';
 
 export interface Phone {
   id: number;
@@ -43,7 +44,7 @@ const phoneService = {
   // Get all phones
   getAllPhones: async (params?: Record<string, any>) => {
     try {
-      const response = await api.get('phones/', { params });
+      const response = await api.get<PaginatedResponse<Phone>>('phones/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -99,9 +100,13 @@ const phoneService = {
   },
 
   // Search phones by code
-  searchByCode: async (code: string) => {
+  searchByCode: async (code: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`phones/?code=${code}`);
+      const params: Record<string, any> = { code };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Phone>>('phones/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -109,9 +114,27 @@ const phoneService = {
   },
 
   // Search phones by name
-  searchByName: async (name: string) => {
+  searchByName: async (name: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`phones/?name=${name}`);
+      const params: Record<string, any> = { name };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Phone>>('phones/', { params });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  
+  // Get phones by brand
+  getByBrand: async (brandId: number, page?: number, pageSize?: number) => {
+    try {
+      const params: Record<string, any> = { brand: brandId };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Phone>>('phones/', { params });
       return response.data;
     } catch (error) {
       throw error;

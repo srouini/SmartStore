@@ -10,6 +10,7 @@ import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import { useForm } from 'react-hook-form';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 const Accessories: React.FC = () => {
   const [accessories, setAccessories] = useState<Accessory[]>([]);
@@ -26,6 +27,14 @@ const Accessories: React.FC = () => {
   const [selectedBrand, setSelectedBrand] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<Accessory>();
 
@@ -51,8 +60,30 @@ const Accessories: React.FC = () => {
   const fetchAccessories = async (params?: Record<string, any>) => {
     try {
       setIsLoading(true);
-      const data = await accessoryService.getAllAccessories(params);
-      setAccessories(data);
+      
+      // Add pagination parameters
+      const paginationParams = {
+        ...params,
+        page: currentPage,
+        page_size: pageSize
+      };
+      
+      const data = await accessoryService.getAllAccessories(paginationParams);
+      
+      if (data && typeof data === 'object' && 'results' in data) {
+        // Handle paginated response
+        setAccessories(data.results);
+        setTotalItems(data.count);
+        setHasNextPage(!!data.next);
+        setHasPrevPage(!!data.previous);
+        setTotalPages(Math.ceil(data.count / pageSize));
+      } else {
+        // Fallback for non-paginated response
+        setAccessories(Array.isArray(data) ? data : []);
+        setTotalItems(Array.isArray(data) ? data.length : 0);
+        setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+      }
+      
       setError(null);
     } catch (err: any) {
       console.error('Error fetching accessories:', err);
@@ -184,29 +215,58 @@ const Accessories: React.FC = () => {
       return;
     }
     
+    setIsLoading(true);
+    setCurrentPage(1); // Reset to first page on new search
+    
     // Determine if search query is a code or name
     if (/^[A-Z0-9-]+$/.test(searchQuery)) {
       // Looks like a code
-      accessoryService.searchByCode(searchQuery)
+      accessoryService.searchByCode(searchQuery, currentPage, pageSize)
         .then(data => {
-          setAccessories(data);
+          if (data && typeof data === 'object' && 'results' in data) {
+            setAccessories(data.results);
+            setTotalItems(data.count);
+            setHasNextPage(!!data.next);
+            setHasPrevPage(!!data.previous);
+            setTotalPages(Math.ceil(data.count / pageSize));
+          } else {
+            // Fallback for non-paginated response
+            setAccessories(Array.isArray(data) ? data : []);
+            setTotalItems(Array.isArray(data) ? data.length : 0);
+            setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+          }
           setError(null);
         })
         .catch(err => {
           console.error('Error searching accessories by code:', err);
           setError('Search failed. Please try again.');
-        });
+          setAccessories([]);
+        })
+        .finally(() => setIsLoading(false));
     } else {
       // Assume it's a name
-      accessoryService.searchByName(searchQuery)
+      accessoryService.searchByName(searchQuery, currentPage, pageSize)
         .then(data => {
-          setAccessories(data);
+          if (data && typeof data === 'object' && 'results' in data) {
+            setAccessories(data.results);
+            setTotalItems(data.count);
+            setHasNextPage(!!data.next);
+            setHasPrevPage(!!data.previous);
+            setTotalPages(Math.ceil(data.count / pageSize));
+          } else {
+            // Fallback for non-paginated response
+            setAccessories(Array.isArray(data) ? data : []);
+            setTotalItems(Array.isArray(data) ? data.length : 0);
+            setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+          }
           setError(null);
         })
         .catch(err => {
           console.error('Error searching accessories by name:', err);
           setError('Search failed. Please try again.');
-        });
+          setAccessories([]);
+        })
+        .finally(() => setIsLoading(false));
     }
   };
 
@@ -214,6 +274,7 @@ const Accessories: React.FC = () => {
     const value = e.target.value;
     const brandId = value ? parseInt(value) : null;
     setSelectedBrand(brandId);
+    setCurrentPage(1); // Reset to first page on filter change
     
     const params: Record<string, any> = {};
     if (brandId) params.brand_id = brandId;
@@ -225,12 +286,15 @@ const Accessories: React.FC = () => {
   const handleCategoryFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setSelectedCategory(value);
+    setCurrentPage(1); // Reset to first page on filter change
     
-    const params: Record<string, any> = {};
-    if (selectedBrand) params.brand_id = selectedBrand;
-    if (value) params.category = value;
-    
-    fetchAccessories(params);
+    if (value) {
+      // Filter accessories by category
+      fetchAccessories({ category: value });
+    } else {
+      // Reset to show all accessories
+      fetchAccessories();
+    }
   };
 
   const columns = [
@@ -368,6 +432,61 @@ const Accessories: React.FC = () => {
           isLoading={isLoading} 
           onRowClick={handleEditAccessory}
         />
+        
+        {/* Server-side Pagination */}
+        {totalItems > 0 && (
+          <div className="flex justify-between items-center mt-6 px-4 py-3">
+            <div className="text-sm text-base-content/70">
+              Showing {accessories.length} of {totalItems} accessories
+            </div>
+            <div className="join">
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={!hasPrevPage}
+              >
+                <FiChevronLeft />
+              </button>
+              
+              {/* Generate page buttons */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Calculate which page numbers to show
+                let pageNum;
+                if (totalPages <= 5) {
+                  // If 5 or fewer pages, show all
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  // If near the start
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  // If near the end
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  // In the middle
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button 
+                    key={pageNum} 
+                    className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={!hasNextPage}
+              >
+                <FiChevronRight />
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Modal

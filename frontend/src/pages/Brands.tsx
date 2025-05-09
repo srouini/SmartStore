@@ -5,6 +5,7 @@ import Table from '../components/common/Table';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import BrandModal from '../components/modals/BrandModal';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 const Brands: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -14,6 +15,15 @@ const Brands: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   // Form handling is now in the BrandModal component
 
@@ -22,22 +32,39 @@ const Brands: React.FC = () => {
     fetchBrands();
   }, []);
 
-  const fetchBrands = async () => {
+  const fetchBrands = async (params?: Record<string, any>) => {
     try {
       setIsLoading(true);
-      const data = await brandService.getAllBrands();
-      console.log('Brands API response:', data);
+      
+      // Add pagination parameters
+      const paginationParams = {
+        ...params,
+        page: currentPage,
+        page_size: pageSize
+      };
+      
+      const data = await brandService.getAllBrands(paginationParams);
       
       // Check if data is an object with results property (paginated response)
       if (data && typeof data === 'object' && 'results' in data) {
-        console.log('Setting brands from results array:', data.results);
         setBrands(data.results);
+        setTotalItems(data.count);
+        setHasNextPage(!!data.next);
+        setHasPrevPage(!!data.previous);
+        setTotalPages(Math.ceil(data.count / pageSize));
       } else if (Array.isArray(data)) {
-        console.log('Setting brands from direct array:', data);
         setBrands(data);
+        setTotalItems(data.length);
+        setTotalPages(Math.ceil(data.length / pageSize));
+        setHasNextPage(currentPage * pageSize < data.length);
+        setHasPrevPage(currentPage > 1);
       } else {
         console.error('Unexpected data format:', data);
         setBrands([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setHasNextPage(false);
+        setHasPrevPage(false);
         setError('Received invalid data format from server');
       }
       
@@ -48,6 +75,44 @@ const Brands: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Handle page change
+  useEffect(() => {
+    fetchBrands();
+  }, [currentPage, pageSize]);
+  
+  const handleSearch = () => {
+    if (!searchQuery) {
+      fetchBrands();
+      return;
+    }
+    
+    setIsLoading(true);
+    setCurrentPage(1); // Reset to first page on new search
+    
+    brandService.searchByName(searchQuery, currentPage, pageSize)
+      .then(data => {
+        if (data && typeof data === 'object' && 'results' in data) {
+          setBrands(data.results);
+          setTotalItems(data.count);
+          setHasNextPage(!!data.next);
+          setHasPrevPage(!!data.previous);
+          setTotalPages(Math.ceil(data.count / pageSize));
+        } else {
+          // Fallback for non-paginated response
+          setBrands(Array.isArray(data) ? data : []);
+          setTotalItems(Array.isArray(data) ? data.length : 0);
+          setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+        }
+        setError(null);
+      })
+      .catch(err => {
+        console.error('Error searching brands by name:', err);
+        setError('Search failed. Please try again.');
+        setBrands([]);
+      })
+      .finally(() => setIsLoading(false));
   };
 
   const handleCreateBrand = () => {
@@ -165,6 +230,29 @@ const Brands: React.FC = () => {
         </div>
       )}
 
+      <div className="mb-4">
+        <div className="form-control w-full max-w-xs">
+          <label className="label">
+            <span className="label-text">Search by Brand Name</span>
+          </label>
+          <div className="flex">
+            <input 
+              type="text" 
+              className="input input-bordered w-full" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Enter brand name"
+            />
+            <Button 
+              className="ml-2" 
+              onClick={handleSearch}
+            >
+              Search
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <Card>
         <Table 
           columns={columns} 
@@ -172,6 +260,61 @@ const Brands: React.FC = () => {
           isLoading={isLoading} 
           onRowClick={handleEditBrand}
         />
+        
+        {/* Server-side Pagination */}
+        {totalItems > 0 && (
+          <div className="flex justify-between items-center mt-6 px-4 py-3">
+            <div className="text-sm text-base-content/70">
+              Showing {brands.length} of {totalItems} brands
+            </div>
+            <div className="join">
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={!hasPrevPage}
+              >
+                <FiChevronLeft />
+              </button>
+              
+              {/* Generate page buttons */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Calculate which page numbers to show
+                let pageNum;
+                if (totalPages <= 5) {
+                  // If 5 or fewer pages, show all
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  // If near the start
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  // If near the end
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  // In the middle
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button 
+                    key={pageNum} 
+                    className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={!hasNextPage}
+              >
+                <FiChevronRight />
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <BrandModal

@@ -8,6 +8,7 @@ import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import { useForm } from 'react-hook-form';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 const Models: React.FC = () => {
   const [models, setModels] = useState<Model[]>([]);
@@ -20,6 +21,15 @@ const Models: React.FC = () => {
   const [editingModel, setEditingModel] = useState<Model | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<Model>();
 
@@ -37,12 +47,47 @@ const Models: React.FC = () => {
       fetchModels();
     }
   }, [selectedBrand]);
+  
+  // Fetch models when page changes
+  useEffect(() => {
+    if (selectedBrand) {
+      fetchModelsByBrand(selectedBrand);
+    } else {
+      fetchModels();
+    }
+  }, [currentPage, pageSize]);
 
   const fetchModels = async () => {
     try {
       setIsLoading(true);
-      const data = await modelService.getAllModels();
-      setModels(data);
+      
+      const params = {
+        page: currentPage,
+        page_size: pageSize
+      };
+      
+      const data = await modelService.getAllModels(params);
+      
+      if (data && typeof data === 'object' && 'results' in data) {
+        setModels(data.results);
+        setTotalItems(data.count);
+        setHasNextPage(!!data.next);
+        setHasPrevPage(!!data.previous);
+        setTotalPages(Math.ceil(data.count / pageSize));
+      } else if (Array.isArray(data)) {
+        setModels(data);
+        setTotalItems(data.length);
+        setTotalPages(Math.ceil(data.length / pageSize));
+        setHasNextPage(currentPage * pageSize < data.length);
+        setHasPrevPage(currentPage > 1);
+      } else {
+        setModels([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setHasNextPage(false);
+        setHasPrevPage(false);
+      }
+      
       setError(null);
     } catch (err: any) {
       console.error('Error fetching models:', err);
@@ -55,8 +100,29 @@ const Models: React.FC = () => {
   const fetchModelsByBrand = async (brandId: number) => {
     try {
       setIsLoading(true);
-      const data = await modelService.getModelsByBrand(brandId);
-      setModels(data);
+      
+      const data = await modelService.getModelsByBrand(brandId, currentPage, pageSize);
+      
+      if (data && typeof data === 'object' && 'results' in data) {
+        setModels(data.results);
+        setTotalItems(data.count);
+        setHasNextPage(!!data.next);
+        setHasPrevPage(!!data.previous);
+        setTotalPages(Math.ceil(data.count / pageSize));
+      } else if (Array.isArray(data)) {
+        setModels(data);
+        setTotalItems(data.length);
+        setTotalPages(Math.ceil(data.length / pageSize));
+        setHasNextPage(currentPage * pageSize < data.length);
+        setHasPrevPage(currentPage > 1);
+      } else {
+        setModels([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setHasNextPage(false);
+        setHasPrevPage(false);
+      }
+      
       setError(null);
     } catch (err: any) {
       console.error('Error fetching models by brand:', err);
@@ -69,7 +135,14 @@ const Models: React.FC = () => {
   const fetchBrands = async () => {
     try {
       const data = await brandService.getAllBrands();
-      setBrands(data);
+      
+      if (data && typeof data === 'object' && 'results' in data) {
+        setBrands(data.results);
+      } else if (Array.isArray(data)) {
+        setBrands(data);
+      } else {
+        setBrands([]);
+      }
     } catch (err: any) {
       console.error('Error fetching brands:', err);
     }
@@ -132,6 +205,44 @@ const Models: React.FC = () => {
   const handleBrandChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setSelectedBrand(value ? parseInt(value) : null);
+    setCurrentPage(1); // Reset to first page on brand change
+  };
+  
+  const handleSearch = () => {
+    if (!searchQuery) {
+      if (selectedBrand) {
+        fetchModelsByBrand(selectedBrand);
+      } else {
+        fetchModels();
+      }
+      return;
+    }
+    
+    setIsLoading(true);
+    setCurrentPage(1); // Reset to first page on new search
+    
+    modelService.searchByName(searchQuery, currentPage, pageSize)
+      .then(data => {
+        if (data && typeof data === 'object' && 'results' in data) {
+          setModels(data.results);
+          setTotalItems(data.count);
+          setHasNextPage(!!data.next);
+          setHasPrevPage(!!data.previous);
+          setTotalPages(Math.ceil(data.count / pageSize));
+        } else {
+          // Fallback for non-paginated response
+          setModels(Array.isArray(data) ? data : []);
+          setTotalItems(Array.isArray(data) ? data.length : 0);
+          setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+        }
+        setError(null);
+      })
+      .catch(err => {
+        console.error('Error searching models by name:', err);
+        setError('Search failed. Please try again.');
+        setModels([]);
+      })
+      .finally(() => setIsLoading(false));
   };
 
   const columns = [
@@ -190,7 +301,7 @@ const Models: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-4">
         <div className="form-control w-full max-w-xs">
           <label className="label">
             <span className="label-text">Filter by Brand</span>
@@ -206,6 +317,27 @@ const Models: React.FC = () => {
             ))}
           </select>
         </div>
+        
+        <div className="form-control w-full max-w-xs">
+          <label className="label">
+            <span className="label-text">Search by Model Name</span>
+          </label>
+          <div className="flex">
+            <input 
+              type="text" 
+              className="input input-bordered w-full" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Enter model name"
+            />
+            <Button 
+              className="ml-2" 
+              onClick={handleSearch}
+            >
+              Search
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Card>
@@ -215,6 +347,61 @@ const Models: React.FC = () => {
           isLoading={isLoading} 
           onRowClick={handleEditModel}
         />
+        
+        {/* Server-side Pagination */}
+        {totalItems > 0 && (
+          <div className="flex justify-between items-center mt-6 px-4 py-3">
+            <div className="text-sm text-base-content/70">
+              Showing {models.length} of {totalItems} models
+            </div>
+            <div className="join">
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={!hasPrevPage}
+              >
+                <FiChevronLeft />
+              </button>
+              
+              {/* Generate page buttons */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Calculate which page numbers to show
+                let pageNum;
+                if (totalPages <= 5) {
+                  // If 5 or fewer pages, show all
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  // If near the start
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  // If near the end
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  // In the middle
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button 
+                    key={pageNum} 
+                    className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              
+              <button 
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={!hasNextPage}
+              >
+                <FiChevronRight />
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Modal
