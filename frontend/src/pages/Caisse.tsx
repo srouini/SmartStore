@@ -83,9 +83,11 @@ const Caisse = () => {
     try {
       const filters: Record<string, any> = { page };
       
-      // Handle caisse filtering based on selected caisse
-      if (selectedCaisse) {
-        // Explicitly set caisse ID as a parameter
+      // Handle caisse filtering based on selected caisse and toggle state
+      // When toggle is ON (showAllOperations=true) -> show all operations (don't filter by caisse)
+      // When toggle is OFF (showAllOperations=false) -> show only selected caisse operations
+      if (!showAllOperations && selectedCaisse) {
+        // Only filter by caisse when not showing all operations
         filters.caisse = selectedCaisse.id;
       }
       
@@ -286,7 +288,11 @@ const Caisse = () => {
                 className={`card bg-base-100 shadow-md cursor-pointer w-60 ${
                   selectedCaisse?.id === caisse.id ? 'border-2 border-primary' : ''
                 }`}
-                onClick={() => setSelectedCaisse(caisse)}
+                onClick={() => {
+                  setSelectedCaisse(caisse);
+                  // When selecting a specific caisse, turn off "show all operations"
+                  setShowAllOperations(false);
+                }}
               >
                 <div className="card-body">
                   <h2 className="card-title">{caisse.name}</h2>
@@ -324,10 +330,12 @@ const Caisse = () => {
                   <button className="tab">Reports</button>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-2 items-center">
+                <div className="flex items-center">
                   <div className="form-control">
                     <label className="cursor-pointer label">
-                      <span className="label-text mr-2">Show all operations</span>
+                      <span className="label-text mr-2">
+                        Show all operations
+                      </span>
                       <input 
                         type="checkbox" 
                         className="toggle toggle-primary" 
@@ -336,51 +344,17 @@ const Caisse = () => {
                           const newShowAllValue = !showAllOperations;
                           setShowAllOperations(newShowAllValue);
                           
-                          // If turning off show all operations, ensure we have a selected caisse
-                          if (showAllOperations && !selectedCaisse && caisses.length > 0) {
+                          // If turning off show all operations and we don't have a selected caisse,
+                          // select the first available caisse
+                          if (!newShowAllValue && !selectedCaisse && caisses.length > 0) {
                             setSelectedCaisse(caisses[0]);
                           }
                           
-                          // Force fetch operations after state update
-                          setTimeout(() => fetchOperations(1), 10);
+                          // Immediately fetch operations with the new filter setting
+                          fetchOperations(1);
                         }} 
                       />
                     </label>
-                  </div>
-                  
-                  {/* Always show the dropdown, but with different options/behavior based on mode */}
-                  <div className="form-control">
-                    <select 
-                      className="select select-bordered w-full max-w-xs" 
-                      onChange={(e) => {
-                        const caisseId = e.target.value;
-                        
-                        // Clear any previous errors
-                        setTimeout(() => {
-                          if (caisseId === "all") {
-                            // Set selectedCaisse to null and force refresh operations
-                            setSelectedCaisse(null);
-                            setTimeout(() => fetchOperations(1), 0);
-                          } else {
-                            const caisse = caisses.find(c => c.id.toString() === caisseId);
-                            if (caisse) {
-                              // Set the selected caisse and force refresh operations
-                              setSelectedCaisse(caisse);
-                              setTimeout(() => fetchOperations(1), 0);
-                            }
-                          }
-                        }, 0);
-                      }}
-                      value={selectedCaisse ? selectedCaisse.id.toString() : "all"}
-                      disabled={!showAllOperations && caisses.length <= 1}
-                    >
-                      {showAllOperations && <option value="all">All Cash Registers</option>}
-                      {caisses.map(caisse => (
-                        <option key={caisse.id} value={caisse.id.toString()}>
-                          {caisse.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
               </div>
