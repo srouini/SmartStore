@@ -6,11 +6,38 @@ import type { Brand } from '../api/brandService';
 import modelService from '../api/modelService';
 import type { Model } from '../api/modelService';
 import Table from '../components/common/Table';
-import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import { useForm } from 'react-hook-form';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+
+// Define PhoneFormData interface to match the form data structure
+interface PhoneFormData {
+  name: string;
+  brand?: number;
+  model?: number;
+  cost_price: number;
+  selling_unite_price: number;
+  selling_semi_bulk_price?: number;
+  selling_bulk_price?: number;
+  description?: string;
+  note?: string;
+  processor?: string;
+  ram_gb?: number;
+  storage_gb?: number;
+  screen_size_inch?: number;
+  screen_type?: string;
+  operating_system?: string;
+  rear_camera_mp?: string;
+  front_camera_mp?: string;
+  battery_mah?: number;
+  color?: string;
+  condition: string;
+  version: string;
+  phone_type: string;
+  photo?: FileList;
+}
+import PhoneModal from '../components/modals/PhoneModal';
 
 const Phones: React.FC = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
@@ -36,7 +63,7 @@ const Phones: React.FC = () => {
   const [selectedBrand, setSelectedBrand] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<Phone>();
+  const { register, reset, watch, setValue, formState: { errors } } = useForm<Phone>();
 
   // Fetch phones, brands, and models on component mount
   useEffect(() => {
@@ -114,18 +141,38 @@ const Phones: React.FC = () => {
   const fetchBrands = async () => {
     try {
       const data = await brandService.getAllBrands();
-      setBrands(data);
+      // Check if data is an array or if it has results property
+      if (Array.isArray(data)) {
+        setBrands(data);
+      } else if (data && typeof data === 'object' && 'results' in data) {
+        setBrands(data.results);
+      } else {
+        // If neither, set an empty array
+        console.warn('Unexpected format for brands data:', data);
+        setBrands([]);
+      }
     } catch (err: any) {
       console.error('Error fetching brands:', err);
+      setBrands([]);
     }
   };
 
   const fetchModels = async () => {
     try {
       const data = await modelService.getAllModels();
-      setModels(data);
+      // Check if data is an array or if it has results property
+      if (Array.isArray(data)) {
+        setModels(data);
+      } else if (data && typeof data === 'object' && 'results' in data) {
+        setModels(data.results);
+      } else {
+        // If neither, set an empty array
+        console.warn('Unexpected format for models data:', data);
+        setModels([]);
+      }
     } catch (err: any) {
       console.error('Error fetching models:', err);
+      setModels([]);
     }
   };
 
@@ -192,18 +239,18 @@ const Phones: React.FC = () => {
     }
   };
 
-  const onSubmit = async (data: any) => {
+  const handlePhoneSubmit = async (data: PhoneFormData) => {
     try {
       const formData = new FormData();
       
-      // Add all form fields to FormData
+      // Add all form fields to FormData except 'photo' (we'll handle that separately)
       Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+        if (key !== 'photo' && data[key] !== undefined && data[key] !== null && data[key] !== '') {
           formData.append(key, data[key]);
         }
       });
       
-      // Handle file upload
+      // Handle file upload - only include photo if a new file is selected
       if (data.photo && data.photo[0]) {
         formData.append('photo', data.photo[0]);
       }
@@ -335,7 +382,7 @@ const Phones: React.FC = () => {
     { 
       header: 'Price', 
       accessor: 'selling_unite_price',
-      render: (value: number) => `$${value.toFixed(2)}`
+      render: (value: any) => `$${Number(value).toFixed(2)}`
     },
     { 
       header: 'Stock', 
@@ -493,360 +540,12 @@ const Phones: React.FC = () => {
         )}
       </Card>
 
-      <Modal
+      <PhoneModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingPhone ? 'Edit Phone' : 'Add Phone'}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit(onSubmit)}>Save</Button>
-          </>
-        }
-       size="5xl"
-      >
-        <form className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="form-control md:col-span-2">
-              <label className="label">
-                <span className="label-text">Model*</span>
-                <span className="label-text-alt text-info">Select a model first</span>
-              </label>
-              <select
-                className={`select select-bordered ${errors.model ? 'select-error' : ''}`}
-                {...register('model', { required: 'Model is required' })}
-              >
-                <option value="">Select a model</option>
-                {ensuredModels.map((model: Model) => {
-                  const brandName = ensuredBrands.find(b => b.id === model.brand)?.name || '';
-                  return (
-                    <option key={model.id} value={model.id}>{brandName} - {model.name}</option>
-                  );
-                })}
-              </select>
-              {errors.model && (
-                <label className="label">
-                  <span className="label-text-alt text-error">{errors.model.message}</span>
-                </label>
-              )}
-            </div>
-
-            <div className="form-control md:col-span-2">
-              <label className="label">
-                <span className="label-text">Photo</span>
-              </label>
-              <input
-                type="file"
-                className="file-input file-input-bordered w-full"
-                accept="image/*"
-                {...register('photo')}
-              />
-            </div>
-
-            <div className="form-control md:col-span-2 hidden">
-              <label className="label">
-                <span className="label-text">Brand</span>
-              </label>
-              <select
-                className="select select-bordered"
-                {...register('brand')}
-                disabled
-              >
-                <option value="">Auto-selected from model</option>
-                {ensuredBrands.map(brand => (
-                  <option key={brand.id} value={brand.id}>{brand.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-control md:col-span-4">
-              <label className="label">
-                <span className="label-text">Variant Name*</span>
-                <span className="label-text-alt text-info">Auto-populated from model, add specifics like color, storage, etc.</span>
-              </label>
-              <input
-                type="text"
-                className={`input input-bordered ${errors.name ? 'input-error' : ''}`}
-                {...register('name', { required: 'Variant name is required' })}
-                placeholder="e.g. iPhone 14 Pro Max 256GB Black"
-              />
-              {errors.name && (
-                <label className="label">
-                  <span className="label-text-alt text-error">{errors.name.message}</span>
-                </label>
-              )}
-            </div>
-
-            {/* Code field removed as it's autogenerated in the backend */}
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Cost Price*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className={`input input-bordered ${errors.cost_price ? 'input-error' : ''}`}
-                {...register('cost_price', { 
-                  required: 'Cost price is required',
-                  min: { value: 0, message: 'Price must be positive' }
-                })}
-              />
-              {errors.cost_price && (
-                <label className="label">
-                  <span className="label-text-alt text-error">{errors.cost_price.message}</span>
-                </label>
-              )}
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Selling Price (Unit)*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className={`input input-bordered ${errors.selling_unite_price ? 'input-error' : ''}`}
-                {...register('selling_unite_price', { 
-                  required: 'Selling price is required',
-                  min: { value: 0, message: 'Price must be positive' }
-                })}
-              />
-              {errors.selling_unite_price && (
-                <label className="label">
-                  <span className="label-text-alt text-error">{errors.selling_unite_price.message}</span>
-                </label>
-              )}
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Selling Price (Semi-Bulk)</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="input input-bordered"
-                {...register('selling_semi_bulk_price')}
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Selling Price (Bulk)</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="input input-bordered"
-                {...register('selling_bulk_price')}
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Condition*</span>
-              </label>
-              <select
-                className={`select select-bordered ${errors.condition ? 'select-error' : ''}`}
-                {...register('condition', { required: 'Condition is required' })}
-              >
-                <option value="NEW">New</option>
-                <option value="USED">Used</option>
-                <option value="REFURBISHED">Refurbished</option>
-              </select>
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Version*</span>
-              </label>
-              <select
-                className={`select select-bordered ${errors.version ? 'select-error' : ''}`}
-                {...register('version', { required: 'Version is required' })}
-              >
-                <option value="ORIGINAL">Original</option>
-                <option value="HIGH_COPY">High Copy</option>
-                <option value="COPY">Copy</option>
-              </select>
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Phone Type*</span>
-              </label>
-              <select
-                className={`select select-bordered ${errors.phone_type ? 'select-error' : ''}`}
-                {...register('phone_type', { required: 'Phone type is required' })}
-              >
-                <option value="SMARTPHONE">Smartphone</option>
-                <option value="FEATURE_PHONE">Feature Phone</option>
-                <option value="TABLET">Tablet</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="divider">Specifications</div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Processor</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                {...register('processor')}
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">RAM (GB)</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                className="input input-bordered"
-                {...register('ram_gb')}
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Storage (GB)</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                className="input input-bordered"
-                {...register('storage_gb')}
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Screen Size (inches)</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                className="input input-bordered"
-                {...register('screen_size_inch')}
-              />
-            </div>
-            
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Operating System</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                {...register('operating_system')}
-                placeholder="e.g. Android 13, iOS 16"
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Screen Type</span>
-              </label>
-              <select className="select select-bordered" {...register('screen_type')}>
-                <option value="">Select Screen Type</option>
-                <option value="oled">OLED</option>
-                <option value="amoled">AMOLED</option>
-                <option value="lcd">LCD</option>
-                <option value="ips_lcd">IPS LCD</option>
-                <option value="retina">Retina</option>
-                <option value="dynamic_amoled">Dynamic AMOLED</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Rear Camera (MP)</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                {...register('rear_camera_mp')}
-                placeholder="e.g. 48MP+12MP+5MP"
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Front Camera (MP)</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                {...register('front_camera_mp')}
-                placeholder="e.g. 16MP"
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Battery (mAh)</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                className="input input-bordered"
-                {...register('battery_mah')}
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Color</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                {...register('color')}
-              />
-            </div>
-          </div>
-
-          <div className="divider">Additional Information</div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* SKU field removed as requested */}
-
-
-
-            <div className="form-control md:col-span-4">
-              <label className="label">
-                <span className="label-text">Description</span>
-              </label>
-              <textarea
-                className="textarea textarea-bordered"
-                rows={3}
-                {...register('description')}
-              ></textarea>
-            </div>
-
-            <div className="form-control md:col-span-4">
-              <label className="label">
-                <span className="label-text">Notes</span>
-              </label>
-              <textarea
-                className="textarea textarea-bordered"
-                rows={3}
-                {...register('note')}
-              ></textarea>
-            </div>
-          </div>
-        </form>
-      </Modal>
+        onSubmit={handlePhoneSubmit}
+        editingPhone={editingPhone}
+      />
     </div>
   );
 };

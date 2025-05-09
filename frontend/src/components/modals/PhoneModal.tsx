@@ -6,27 +6,7 @@ import brandService from '../../api/brandService';
 import modelService from '../../api/modelService';
 import type { Brand } from '../../api/brandService';
 import type { Model } from '../../api/modelService';
-import type { Phone } from '../../api/phoneService';
-
-// Define the PhoneFormData interface since it's not exported from phoneService
-interface PhoneFormData {
-  name: string;
-  brand?: number;
-  model?: number;
-  cost_price: number;
-  selling_unite_price: number;
-  selling_semi_bulk_price?: number;
-  selling_bulk_price?: number;
-  description?: string;
-  condition: string;
-  version: string;
-  storage_gb: number;
-  ram_gb: number;
-  color?: string;
-  phone_type: string;
-  screen_type: string;
-  photo?: FileList;
-}
+import type { Phone, PhoneFormData } from '../../api/phoneService';
 
 interface PhoneModalProps {
   isOpen: boolean;
@@ -43,29 +23,63 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
 }) => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const [selectedBrand, setSelectedBrand] = useState<number | null>(editingPhone?.brand || null);
+  // Handle both brand as object or direct ID
+  const [selectedBrand, setSelectedBrand] = useState<number | null>(
+    editingPhone && editingPhone.brand ? 
+      (typeof editingPhone.brand === 'object' ? editingPhone.brand?.id : editingPhone.brand) || null 
+      : null
+  );
   const [isLoadingBrands, setIsLoadingBrands] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<PhoneFormData>({
-    defaultValues: {
-      name: editingPhone?.name || '',
-      brand: editingPhone?.brand || undefined,
-      model: editingPhone?.model || undefined,
-      cost_price: editingPhone?.cost_price || 0,
-      selling_unite_price: editingPhone?.selling_unite_price || 0,
-      selling_semi_bulk_price: editingPhone?.selling_semi_bulk_price || 0,
-      selling_bulk_price: editingPhone?.selling_bulk_price || 0,
-      description: editingPhone?.description || '',
-      condition: editingPhone?.condition || 'new',
-      version: editingPhone?.version || 'global',
-      storage_gb: editingPhone?.storage_gb || 0,
-      ram_gb: editingPhone?.ram_gb || 0,
-      color: editingPhone?.color || '',
-      phone_type: editingPhone?.phone_type || 'ordinary',
-      screen_type: editingPhone?.screen_type || 'lcd',
+  // Log the editing phone to debug
+  useEffect(() => {
+    if (editingPhone) {
+      console.log('Editing phone data:', editingPhone);
     }
-  });
+  }, [editingPhone]);
+
+  const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<PhoneFormData>();
+  
+  // Set form values when editingPhone changes
+  useEffect(() => {
+    if (editingPhone) {
+      // Handle both direct values and nested objects for brand and model
+      const brandId = editingPhone.brand ? 
+        (typeof editingPhone.brand === 'object' ? editingPhone.brand?.id : editingPhone.brand) 
+        : undefined;
+      const modelId = editingPhone.model ? 
+        (typeof editingPhone.model === 'object' ? editingPhone.model?.id : editingPhone.model) 
+        : undefined;
+      
+      reset({
+        name: editingPhone.name || '',
+        brand: brandId,
+        model: modelId,
+        cost_price: editingPhone.cost_price || 0,
+        selling_unite_price: editingPhone.selling_unite_price || 0,
+        selling_semi_bulk_price: editingPhone.selling_semi_bulk_price || 0,
+        selling_bulk_price: editingPhone.selling_bulk_price || 0,
+        description: editingPhone.description || '',
+        condition: editingPhone.condition || 'new',
+        version: editingPhone.version || 'global',
+        storage_gb: editingPhone.storage_gb || 0,
+        ram_gb: editingPhone.ram_gb || 0,
+        color: editingPhone.color || '',
+        phone_type: editingPhone.phone_type || 'ordinary',
+        screen_type: editingPhone.screen_type || 'lcd',
+        processor: editingPhone.processor || '',
+        operating_system: editingPhone.operating_system || '',
+        rear_camera_mp: editingPhone.rear_camera_mp || '',
+        front_camera_mp: editingPhone.front_camera_mp || '',
+        battery_mah: editingPhone.battery_mah || 0,
+        note: editingPhone.note || '',
+      });
+      
+      // Set selected brand for model filtering
+      setSelectedBrand(brandId);
+    }
+  }, [editingPhone, reset]);
 
   const watchBrand = watch('brand');
 
@@ -80,6 +94,11 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
         } else if (data && typeof data === 'object' && 'results' in data) {
           setBrands(data.results);
         }
+        
+        // After brands are loaded, if we're editing and have a brand ID, fetch models for that brand
+        if (editingPhone && selectedBrand) {
+          fetchModelsForBrand(selectedBrand);
+        }
       } catch (error) {
         console.error('Error fetching brands:', error);
       } finally {
@@ -90,27 +109,30 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
     fetchBrands();
   }, []);
 
+  // Function to fetch models for a brand
+  const fetchModelsForBrand = async (brandId: number) => {
+    try {
+      setIsLoadingModels(true);
+      const data = await modelService.getModelsByBrand(brandId);
+      if (Array.isArray(data)) {
+        setModels(data);
+      } else if (data && typeof data === 'object' && 'results' in data) {
+        setModels(data.results);
+      } else {
+        setModels([]);
+      }
+    } catch (error) {
+      console.error('Error fetching models:', error);
+      setModels([]);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
   // Fetch models when brand changes
   useEffect(() => {
     if (watchBrand) {
-      const fetchModels = async () => {
-        try {
-          setIsLoadingModels(true);
-          const data = await modelService.getModelsByBrand(watchBrand);
-          if (Array.isArray(data)) {
-            setModels(data);
-          } else if (data && typeof data === 'object' && 'results' in data) {
-            setModels(data.results);
-          }
-        } catch (error) {
-          console.error('Error fetching models:', error);
-          setModels([]);
-        } finally {
-          setIsLoadingModels(false);
-        }
-      };
-
-      fetchModels();
+      fetchModelsForBrand(parseInt(watchBrand.toString()));
     } else {
       setModels([]);
     }
@@ -154,7 +176,9 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
             className={`select select-bordered ${errors.brand ? 'select-error' : ''}`}
             {...register('brand', { required: 'Brand is required' })}
             onChange={(e) => {
-              setValue('brand', parseInt(e.target.value));
+              const brandId = parseInt(e.target.value);
+              setValue('brand', brandId);
+              setSelectedBrand(brandId); // Update selectedBrand state for model filtering
               setValue('model', undefined); // Reset model when brand changes
             }}
             disabled={isLoadingBrands}
@@ -179,12 +203,14 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
           </label>
           <select
             className={`select select-bordered ${errors.model ? 'select-error' : ''}`}
+            {...register('model', { required: 'Model is required' })}
             disabled={!watchBrand || isLoadingModels}
-            {...register('model')}
           >
             <option value="">Select a model</option>
-            {models.map(model => (
-              <option key={model.id} value={model.id}>{model.name}</option>
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
             ))}
           </select>
         </div>
@@ -351,10 +377,9 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
               {...register('phone_type', { required: 'Phone type is required' })}
             >
               <option value="ordinary">Ordinary</option>
-              <option value="smartphone">Smartphone</option>
-              <option value="feature_phone">Feature Phone</option>
-              <option value="flip_phone">Flip Phone</option>
-              <option value="slider">Slider</option>
+              <option value="foldable">Foldable</option>
+              <option value="flip">Flip</option>
+              <option value="tablet">Tablet</option>
               <option value="gaming">Gaming Phone</option>
               <option value="rugged">Rugged Phone</option>
               <option value="other">Other</option>
@@ -377,9 +402,9 @@ const PhoneModal: React.FC<PhoneModalProps> = ({
               <option value="lcd">LCD</option>
               <option value="oled">OLED</option>
               <option value="amoled">AMOLED</option>
-              <option value="super_amoled">Super AMOLED</option>
               <option value="ips_lcd">IPS LCD</option>
-              <option value="tft_lcd">TFT LCD</option>
+              <option value="retina">Retina</option>
+              <option value="dynamic_amoled">Dynamic AMOLED</option>
               <option value="other">Other</option>
             </select>
             {errors.screen_type && (
