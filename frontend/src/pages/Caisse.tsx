@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getCaisses, depositFunds, withdrawFunds, getCaisseOperations, createCaisse } from '../services/caisseService';
-import { Caisse as CaisseType, CaisseOperation, PaginatedResponse } from '../types/Caisse';
+import { Caisse as CaisseType, CaisseOperation } from '../types/Caisse';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import React from 'react';
 
 const Caisse = () => {
   const [caisses, setCaisses] = useState<CaisseType[]>([]);
@@ -66,54 +65,33 @@ const Caisse = () => {
     fetchCaisses();
   }, []);
 
-  // Simple fetch function without useCallback to avoid closure issues
   const fetchOperations = async (page: number, applyFilters = false) => {
-    console.log('fetchOperations called with page:', page, 'applyFilters:', applyFilters);
     setOperationsLoading(true);
     try {
-      // Create filters object
       const filters: Record<string, any> = { page };
       
-      // Always apply caisse filter if applicable
       if (!showAllOperations && selectedCaisse) {
         filters.caisse = selectedCaisse.id;
-        console.log('Applying caisse filter:', selectedCaisse.id);
       }
       
-      // Only apply these filters when explicitly requested (via Filter button)
       if (applyFilters) {
-        console.log('Applying additional filters');
-        
         if (filterOperationType) {
           filters.operation_type = filterOperationType;
-          console.log('Operation type filter:', filterOperationType);
         }
         
         if (filterPerformedBy) {
-          // Send as 'search' parameter which works with the backend search fields
           filters.search = filterPerformedBy;
-          console.log('Performed by (search) filter:', filterPerformedBy);
         }
         
         if (filterDate) {
-          // Create start_date as beginning of day
           filters.start_date = filterDate;
-          
-          // Create end_date as end of the same day (if only filtering by one day)
           const nextDay = new Date(filterDate);
           nextDay.setDate(nextDay.getDate() + 1);
           filters.end_date = nextDay.toISOString().split('T')[0];
-          
-          console.log('Date range filter:', filters.start_date, 'to', filters.end_date);
         }
       }
       
-      // Very important: log exactly what we're sending to help debug
-      console.log('Final API filters:', filters);
-      
-      // Make the API call
       const response = await getCaisseOperations(page, filters);
-      console.log('API response:', response);
       
       if (response && response.results) {
         setOperations(response.results);
@@ -136,58 +114,45 @@ const Caisse = () => {
     }
   };
   
-  // Apply filters function - called directly from button click
   const applyFilters = () => {
-    console.log('Apply filters button clicked');
-    fetchOperations(1, true); // Fetch page 1 with filters applied
+    fetchOperations(1, true);
   };
   
-  // Reset filters function
   const resetFilters = () => {
-    console.log('Reset filters button clicked');
     setFilterOperationType('');
     setFilterAmountGreaterThan('');
     setFilterAmountLessThan('');
     setFilterPerformedBy('');
     setFilterDate('');
-    fetchOperations(1, false); // Fetch without filters
+    fetchOperations(1, false);
   };
 
-  // Only fetch when caisse/showAllOperations changes
   useEffect(() => {
-    console.log('Main effect running - caisse or showAllOperations changed');
-    fetchOperations(1, false); // Don't apply extra filters on initial load
+    fetchOperations(1, false);
   }, [selectedCaisse, showAllOperations]);
 
-  
   useEffect(() => {
-    // Calculate report data when operations change
     if (operations.length > 0) {
       calculateReportData();
     }
   }, [operations]);
   
   const calculateReportData = () => {
-    // Calculate deposits total
     const deposits = operations.filter(op => op.operation_type === 'DEPOSIT');
     const totalDeposits = deposits.reduce((sum, op) => sum + Number(op.amount), 0);
     
-    // Calculate withdrawals total
     const withdrawals = operations.filter(op => op.operation_type === 'WITHDRAWAL');
     const totalWithdrawals = Math.abs(withdrawals.reduce((sum, op) => sum + Number(op.amount), 0));
     
-    // Calculate today's operations
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayOperations = operations.filter(op => new Date(op.timestamp) >= today).length;
     
-    // Calculate this week's operations
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     oneWeekAgo.setHours(0, 0, 0, 0);
     const weeklyOperations = operations.filter(op => new Date(op.timestamp) >= oneWeekAgo).length;
     
-    // Count operations by type
     const operationsByType: Record<string, number> = {};
     operations.forEach(op => {
       if (!operationsByType[op.operation_type]) {
@@ -236,30 +201,27 @@ const Caisse = () => {
   const handleDeposit = async () => {
     if (!selectedCaisse) return;
     
-    // Validate deposit amount
     const amount = parseFloat(depositAmount);
     if (isNaN(amount) || amount <= 0) {
       setDepositError('Please enter a valid amount greater than 0');
       return;
     }
-    
+
     try {
-      await depositFunds(selectedCaisse.id, { 
-        amount, 
-        description: depositDescription || 'Manual deposit' 
-      });
+      await depositFunds(selectedCaisse.id, {
+  amount,
+  description: depositDescription
+});
       
-      // Reset form and close modal
       setDepositAmount('');
       setDepositDescription('');
       setDepositError('');
       setIsDepositModalOpen(false);
       
-      // Refresh data
       await fetchCaisses();
       await fetchOperations(1);
       
-      showNotification(`Successfully added $${amount.toFixed(2)} to ${selectedCaisse.name}`, 'success');
+      showNotification(`Successfully deposited $${amount.toFixed(2)}`, 'success');
     } catch (error) {
       console.error('Error adding funds:', error);
       setDepositError('Failed to add funds. Please try again.');
@@ -269,35 +231,32 @@ const Caisse = () => {
   const handleWithdrawal = async () => {
     if (!selectedCaisse) return;
     
-    // Validate withdrawal amount
     const amount = parseFloat(withdrawalAmount);
     if (isNaN(amount) || amount <= 0) {
       setWithdrawalError('Please enter a valid amount greater than 0');
       return;
     }
-    
+
     if (amount > Number(selectedCaisse.current_balance)) {
-      setWithdrawalError('Amount cannot exceed current balance');
+      setWithdrawalError('Withdrawal amount exceeds current balance');
       return;
     }
-    
+
     try {
-      await withdrawFunds(selectedCaisse.id, { 
-        amount, 
-        description: withdrawalDescription || 'Manual withdrawal' 
-      });
+      await withdrawFunds(selectedCaisse.id, {
+  amount,
+  description: withdrawalDescription
+});
       
-      // Reset form and close modal
       setWithdrawalAmount('');
       setWithdrawalDescription('');
       setWithdrawalError('');
       setIsWithdrawalModalOpen(false);
       
-      // Refresh data
       await fetchCaisses();
       await fetchOperations(1);
       
-      showNotification(`Successfully withdrew $${amount.toFixed(2)} from ${selectedCaisse.name}`, 'success');
+      showNotification(`Successfully withdrew $${amount.toFixed(2)}`, 'success');
     } catch (error) {
       console.error('Error withdrawing funds:', error);
       setWithdrawalError('Failed to withdraw funds. Please try again.');
@@ -309,16 +268,14 @@ const Caisse = () => {
       setCreateError('Please enter a name for the cash register');
       return;
     }
-    
+
     try {
       await createCaisse({ name: newCaisseName });
       
-      // Reset form and close modal
       setNewCaisseName('');
       setCreateError('');
       setIsCreateModalOpen(false);
       
-      // Refresh data
       await fetchCaisses();
       
       showNotification(`Successfully created cash register "${newCaisseName}"`, 'success');
@@ -391,18 +348,14 @@ const Caisse = () => {
           </button>
         </div>
       ) : (
-        <div>
-          {/* Cash Register Cards */}
+        <>
           <div className="flex flex-wrap gap-4 mb-6">
             {caisses.map((caisse) => (
               <div 
                 key={caisse.id}
-                className={`card bg-base-100 shadow-md cursor-pointer w-60 ${
-                  selectedCaisse?.id === caisse.id ? 'border-2 border-primary' : ''
-                }`}
+                className={`card bg-base-100 shadow-md cursor-pointer w-60 ${selectedCaisse?.id === caisse.id ? 'border-2 border-primary' : ''}`}
                 onClick={() => {
                   setSelectedCaisse(caisse);
-                  // When selecting a specific caisse, turn off "show all operations"
                   setShowAllOperations(false);
                 }}
               >
@@ -439,9 +392,7 @@ const Caisse = () => {
             <div className="flex items-center">
               <div className="form-control">
                 <label className="cursor-pointer label">
-                  <span className="label-text mr-2">
-                    Show all operations
-                  </span>
+                  <span className="label-text mr-2">Show all operations</span>
                   <input 
                     type="checkbox" 
                     className="toggle toggle-primary" 
@@ -459,13 +410,36 @@ const Caisse = () => {
 
           {/* Content based on active tab */}
           {activeTab === 'operations' ? (
-            <div>
+            <>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button
+                  className="btn btn-success"
+                  disabled={!selectedCaisse}
+                  onClick={() => setIsDepositModalOpen(true)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Deposit
+                </button>
+                <button
+                  className="btn btn-error"
+                  disabled={!selectedCaisse || Number(selectedCaisse.current_balance) <= 0}
+                  onClick={() => setIsWithdrawalModalOpen(true)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Withdraw
+                </button>
+              </div>
+
               {/* Operation Filters */}
               <form
-                className="flex flex-wrap gap-4 mb-4 items-end bg-base-200 p-4 rounded-lg"
+                className="flex flex-wrap gap-4 mb-4 items-end p-4 rounded-lg"
                 onSubmit={e => {
                   e.preventDefault();
-                  applyFilters(); // Use the new applyFilters function
+                  applyFilters();
                 }}
               >
                 <div>
@@ -483,28 +457,6 @@ const Caisse = () => {
                     <option value="ADJUSTMENT">Balance Adjustment</option>
                   </select>
                 </div>
-                {/* Amount filters are disabled until backend supports them
-                <div>
-                  <label className="label label-text">Amount &gt;=</label>
-                  <input
-                    type="number"
-                    className="input input-bordered"
-                    value={filterAmountGreaterThan}
-                    onChange={e => setFilterAmountGreaterThan(e.target.value)}
-                    placeholder="Min amount"
-                  />
-                </div>
-                <div>
-                  <label className="label label-text">Amount &lt;=</label>
-                  <input
-                    type="number"
-                    className="input input-bordered"
-                    value={filterAmountLessThan}
-                    onChange={e => setFilterAmountLessThan(e.target.value)}
-                    placeholder="Max amount"
-                  />
-                </div>
-                */}
                 <div>
                   <label className="label label-text">Performed By</label>
                   <input
@@ -529,12 +481,14 @@ const Caisse = () => {
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    onClick={resetFilters} // Use the new resetFilters function
+                    onClick={resetFilters}
                   >
                     Reset
                   </button>
                 </div>
               </form>
+
+              {/* Operations Table */}
               {operationsLoading ? (
                 <div className="flex justify-center py-10">
                   <span className="loading loading-spinner loading-md"></span>
@@ -562,46 +516,29 @@ const Caisse = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {operations.map((operation) => (
-                          <tr key={operation.id}>
-                            <td>{formatDate(operation.timestamp)}</td>
-                            <td>
-                              <span className={`badge ${getOperationTypeClass(operation.operation_type)}`}>
-                                {operation.operation_type_display}
-                              </span>
-                            </td>
-                            <td className={Number(operation.amount) >= 0 ? 'text-success font-bold' : 'text-error font-bold'}>
-                              {Number(operation.amount) >= 0 ? '+' : ''}{Number(operation.amount).toFixed(2)}
-                            </td>
-                            <td>{Number(operation.balance_after).toFixed(2)}</td>
-                            <td>{operation.description || '-'}</td>
-                            <td>{operation.performed_by_username || 'System'}</td>
+                        {operations.map((op) => (
+                          <tr key={op.id}>
+                            <td>{formatDate(op.timestamp)}</td>
+                            <td><span className={`badge ${getOperationTypeClass(op.operation_type)}`}>{op.operation_type.replace('_', ' ')}</span></td>
+                            <td>{Number(op.amount).toFixed(2)}</td>
+                            <td>{Number(op.balance_after).toFixed(2)}</td>
+                            <td>{op.description}</td>
+                            <td>{op.performed_by_username || 'System'}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-between items-center mt-4">
-                  <span className="text-sm text-gray-600">
-                    Showing {operations.length} of {totalOperations} operations
-                    {showAllOperations 
-                      ? " across all cash registers" 
-                      : selectedCaisse ? ` for ${selectedCaisse.name}` : ""}
-                  </span>
-                  <div className="join">
-                    {/* Previous page button */}
+
+                  {/* Pagination */}
+                  <div className="join flex justify-center mt-4">
                     <button 
                       className="join-item btn btn-sm"
                       onClick={() => fetchOperations(currentPage - 1)}
                       disabled={currentPage === 1}
                     >
-                       <FiChevronLeft />
+                      <FiChevronLeft />
                     </button>
-                    {/* Page number buttons */}
                     {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                       let pageNum;
                       if (totalPages <= 5) {
@@ -623,7 +560,6 @@ const Caisse = () => {
                         </button>
                       );
                     })}
-                    {/* Next page button */}
                     <button 
                       className="join-item btn btn-sm"
                       onClick={() => fetchOperations(currentPage + 1)}
@@ -634,13 +570,51 @@ const Caisse = () => {
                   </div>
                 </div>
               )}
-            </div>
+            </>
           ) : (
-            <div>
-              {/* Reports tab content */}
+            <div className="bg-base-100 rounded-lg p-6 shadow">
+              <h2 className="text-xl font-bold mb-4">Reports</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="stats shadow">
+                  <div className="stat">
+                    <div className="stat-title">Total Deposits</div>
+                    <div className="stat-value text-success">${reportData.totalDeposits.toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="stats shadow">
+                  <div className="stat">
+                    <div className="stat-title">Total Withdrawals</div>
+                    <div className="stat-value text-error">${reportData.totalWithdrawals.toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="stats shadow">
+                  <div className="stat">
+                    <div className="stat-title">Today's Operations</div>
+                    <div className="stat-value">{reportData.todayOperations}</div>
+                  </div>
+                </div>
+                <div className="stats shadow">
+                  <div className="stat">
+                    <div className="stat-title">This Week's Operations</div>
+                    <div className="stat-value">{reportData.weeklyOperations}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2">Operations by Type</h3>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(reportData.operationsByType).map(([type, count]) => (
+                    <div key={type} className="badge badge-lg gap-2">
+                      <span className={`badge ${getOperationTypeClass(type)}`}></span>
+                      {type.replace('_', ' ')}: {count}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Deposit Modal */}
