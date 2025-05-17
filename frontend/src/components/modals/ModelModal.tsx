@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import type { Brand } from '../../api/brandService';
+import { useBrands } from '../../contexts/BrandModelContext';
 
 // Define extended Model interface with all new specification fields
 interface ExtendedModel {
@@ -105,16 +106,37 @@ interface ModelModalProps {
   onClose: () => void;
   onSubmit: (data: ModelFormData) => void;
   editingModel: ExtendedModel | null;
-  brands: Brand[];
 }
 
 const ModelModal: React.FC<ModelModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  editingModel,
-  brands
+  editingModel
 }) => {
+  // Get brands from context
+  const brands = useBrands();
+  
+  // Handle both brand as object or direct ID
+  const [selectedBrand, setSelectedBrand] = useState<number | null>(null);
+  
+  // Initialize selectedBrand based on editingModel if available
+  useEffect(() => {
+    if (editingModel) {
+      const brand = editingModel.brand;
+      if (brand !== null && brand !== undefined) {
+        // Handle object or direct ID format
+        const brandValue = brand as (object & {id: number}) | number;
+        const brandId = typeof brandValue === 'object' 
+          ? brandValue.id 
+          : Number(brandValue);
+        
+        if (!isNaN(brandId)) {
+          setSelectedBrand(brandId);
+        }
+      }
+    }
+  }, [editingModel]);
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ModelFormData>();
   
   // GSMArena import functionality
@@ -123,6 +145,51 @@ const ModelModal: React.FC<ModelModalProps> = ({
   const [error, setError] = useState('');
   const [parsedModel, setParsedModel] = useState<any>(null);
   const [fieldsImported, setFieldsImported] = useState<Record<string, boolean>>({});
+  
+  // State to control collapsible sections individually
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    network: false,
+    launch: false,
+    body: false,
+    display: false,
+    platform: false,
+    memory: false,
+    camera: false,
+    sound: false,
+    comms: false,
+    features: false,
+    battery: false,
+    misc: false
+  });
+  
+  // Helper functions to expand/collapse all sections
+  const expandAllSections = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const allExpanded = Object.keys(expandedSections).reduce((acc, key) => {
+      acc[key] = true;
+      return acc;
+    }, {} as Record<string, boolean>);
+    setExpandedSections(allExpanded);
+  };
+  
+  const collapseAllSections = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const allCollapsed = Object.keys(expandedSections).reduce((acc, key) => {
+      acc[key] = false;
+      return acc;
+    }, {} as Record<string, boolean>);
+    setExpandedSections(allCollapsed);
+  };
+  
+  // Toggle individual section
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
   
   // Helper function to validate GSMArena URL
   const isValidGSMArenaUrl = (url: string): boolean => {
@@ -400,7 +467,7 @@ const ModelModal: React.FC<ModelModalProps> = ({
       
       const networkTechnology = networkTechCell ? 
                               networkTechCell.querySelector('td.nfo')?.textContent?.trim() || '' : 
-                              extractByDataSpec('network') || 
+                              extractByDataSpec('speed') || 
                               extractSpec(['Network', 'Technology']) || 
                               '';
       
@@ -724,6 +791,8 @@ const ModelModal: React.FC<ModelModalProps> = ({
               </div>
             </div>
           )}
+          
+
         </div>
         <div className="form-control">
           <label className="label">
@@ -732,10 +801,17 @@ const ModelModal: React.FC<ModelModalProps> = ({
           <select
             className={`select select-bordered ${errors.brand ? 'select-error' : ''}`}
             {...register('brand', { required: 'Brand is required' })}
+            onChange={(e) => {
+              const brandId = parseInt(e.target.value);
+              setValue('brand', brandId);
+              setSelectedBrand(brandId);
+            }}
           >
             <option value="">Select a brand</option>
-            {brands.map(brand => (
-              <option key={brand.id} value={brand.id}>{brand.name}</option>
+            {brands.map((brand) => (
+              <option key={brand.id} value={brand.id}>
+                {brand.name}
+              </option>
             ))}
           </select>
           {errors.brand && (
@@ -785,9 +861,34 @@ const ModelModal: React.FC<ModelModalProps> = ({
           ></textarea>
         </div>
         
+        {/* Expand/Collapse All Buttons for specification sections */}
+        <div className="flex justify-end space-x-2 mt-4 mb-2">
+          <Button 
+            type="button"
+            size="sm" 
+            variant="link" 
+            onClick={expandAllSections}
+          >
+            Expand All Specs
+          </Button>
+          <Button 
+            type="button"
+            size="sm" 
+            variant="link" 
+            onClick={collapseAllSections}
+          >
+            Collapse All Specs
+          </Button>
+        </div>
+        
         {/* Network Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-4">
-          <input type="checkbox" className="peer" /> 
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.network} 
+            onChange={() => toggleSection('network')} 
+          /> 
           <div className="collapse-title text-md font-medium">
             Network Specifications
           </div>
@@ -808,7 +909,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Launch Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.launch} 
+            onChange={() => toggleSection('launch')} 
+          />
           <div className="collapse-title text-md font-medium">
             Launch Information
           </div>
@@ -843,7 +949,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Body Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.body} 
+            onChange={() => toggleSection('body')} 
+          />
           <div className="collapse-title text-md font-medium">
             Body Specifications
           </div>
@@ -916,7 +1027,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Display Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.display} 
+            onChange={() => toggleSection('display')} 
+          />
           <div className="collapse-title text-md font-medium">
             Display Specifications
           </div>
@@ -963,7 +1079,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Platform Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.platform} 
+            onChange={() => toggleSection('platform')} 
+          />
           <div className="collapse-title text-md font-medium">
             Platform Specifications
           </div>
@@ -1024,7 +1145,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Memory Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.memory} 
+            onChange={() => toggleSection('memory')} 
+          />
           <div className="collapse-title text-md font-medium">
             Memory Specifications
           </div>
@@ -1059,7 +1185,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Camera Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.camera} 
+            onChange={() => toggleSection('camera')} 
+          />
           <div className="collapse-title text-md font-medium">
             Camera Specifications
           </div>
@@ -1092,7 +1223,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Sound Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.sound} 
+            onChange={() => toggleSection('sound')} 
+          />
           <div className="collapse-title text-md font-medium">
             Sound Specifications
           </div>
@@ -1113,7 +1249,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Communications Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.comms} 
+            onChange={() => toggleSection('comms')} 
+          />
           <div className="collapse-title text-md font-medium">
             Communications
           </div>
@@ -1160,7 +1301,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Features Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.features} 
+            onChange={() => toggleSection('features')} 
+          />
           <div className="collapse-title text-md font-medium">
             Features
           </div>
@@ -1181,7 +1327,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Battery Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.battery} 
+            onChange={() => toggleSection('battery')} 
+          />
           <div className="collapse-title text-md font-medium">
             Battery Specifications
           </div>
@@ -1216,7 +1367,12 @@ const ModelModal: React.FC<ModelModalProps> = ({
         
         {/* Misc Section */}
         <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
-          <input type="checkbox" className="peer" />
+          <input 
+            type="checkbox" 
+            className="peer" 
+            checked={expandedSections.misc} 
+            onChange={() => toggleSection('misc')} 
+          />
           <div className="collapse-title text-md font-medium">
             Miscellaneous
           </div>
