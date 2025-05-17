@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 from .models import Supplier, Purchase, PurchaseItem
 from .serializers import (
@@ -9,11 +10,18 @@ from .serializers import (
     CreatePurchaseSerializer
 )
 
+# Custom pagination class
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 # Supplier ViewSet
 class SupplierViewSet(viewsets.ModelViewSet):
     queryset = Supplier.objects.all().order_by('name')
     serializer_class = SupplierSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -35,6 +43,7 @@ class PurchaseViewSet(viewsets.ModelViewSet):
     queryset = Purchase.objects.all().order_by('-date')
     serializer_class = PurchaseSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         queryset = super().get_queryset()

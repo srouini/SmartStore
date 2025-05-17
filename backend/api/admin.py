@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Brand, Model, Product, Phone, Accessory, 
-    Stock, Sale, SaleItem, Invoice
+    Stock, Sale, SaleItem, Invoice, Caisse, CaisseOperation
 )
 
 @admin.register(Brand)
@@ -54,3 +54,17 @@ class InvoiceAdmin(admin.ModelAdmin):
     list_display = ('invoice_number', 'sale', 'invoice_date', 'total_amount')
     search_fields = ('invoice_number', 'customer_info')
     date_hierarchy = 'invoice_date'
+
+@admin.register(Caisse)
+class CaisseAdmin(admin.ModelAdmin):
+    list_display = ('name', 'current_balance', 'last_updated')
+    search_fields = ('name',)
+    list_filter = ('name',)
+    readonly_fields = ('current_balance', 'last_updated')
+
+@admin.register(CaisseOperation)
+class CaisseOperationAdmin(admin.ModelAdmin):
+    list_display = ('caisse', 'operation_type', 'amount', 'balance_after', 'description', 'performed_by', 'timestamp')
+    list_filter = ('caisse', 'operation_type', 'performed_by')
+    search_fields = ('description', 'performed_by__username')
+    date_hierarchy = 'timestamp'

@@ -6,12 +6,15 @@ router = DefaultRouter()
 router.register(r'brands', views.BrandViewSet)
 router.register(r'models', views.ModelViewSet)
 router.register(r'phones', views.PhoneViewSet)
+router.register(r'phone-images', views.PhoneImageViewSet)
 router.register(r'accessories', views.AccessoryViewSet)
 router.register(r'stock', views.StockViewSet)
 router.register(r'sales', views.SaleViewSet)
 router.register(r'invoices', views.InvoiceViewSet)
 router.register(r'suppliers', views.SupplierViewSet)
 router.register(r'purchases', views.PurchaseViewSet)
+router.register(r'caisse', views.CaisseViewSet)
+router.register(r'caisse-operations', views.CaisseOperationViewSet)
 
 urlpatterns = [
     # Authentication endpoints

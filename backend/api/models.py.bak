@@ -41,58 +41,6 @@ class Model(models.Model):
     name = models.CharField(max_length=100) # e.g., "iPhone 13 Pro", "Galaxy S22 Ultra"
     description = models.TextField(blank=True, null=True) # Added description for model
     release_date = models.DateField(blank=True, null=True) # Added release date
-    
-    # Network
-    network_technology = models.CharField(max_length=200, blank=True, null=True)
-    
-    # Launch
-    launch_announced = models.CharField(max_length=100, blank=True, null=True)
-    launch_status = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Body
-    body_dimensions = models.CharField(max_length=100, blank=True, null=True)
-    body_weight = models.CharField(max_length=50, blank=True, null=True)
-    body_build = models.CharField(max_length=200, blank=True, null=True)
-    body_sim = models.CharField(max_length=100, blank=True, null=True)
-    body_water_resistant = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Display
-    display_type = models.CharField(max_length=200, blank=True, null=True)
-    display_size = models.CharField(max_length=100, blank=True, null=True)
-    display_resolution = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Platform
-    platform_os = models.CharField(max_length=100, blank=True, null=True)
-    platform_chipset = models.CharField(max_length=200, blank=True, null=True)
-    platform_cpu = models.CharField(max_length=200, blank=True, null=True)
-    platform_gpu = models.CharField(max_length=200, blank=True, null=True)
-    
-    # Memory
-    memory_card_slot = models.CharField(max_length=100, blank=True, null=True)
-    memory_internal = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Camera
-    main_camera = models.CharField(max_length=500, blank=True, null=True)
-    selfie_camera = models.CharField(max_length=500, blank=True, null=True)
-    
-    # Sound
-    sound_loudspeaker = models.CharField(max_length=100, blank=True, null=True)
-    sound_jack = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Communications
-    comms_nfc = models.CharField(max_length=50, blank=True, null=True)
-    comms_infrared_port = models.CharField(max_length=50, blank=True, null=True)
-    comms_usb = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Features
-    features_sensors = models.CharField(max_length=500, blank=True, null=True)
-    
-    # Battery
-    battery_type = models.CharField(max_length=100, blank=True, null=True)
-    battery_charging = models.CharField(max_length=200, blank=True, null=True)
-    
-    # Misc
-    misc_colors = models.CharField(max_length=200, blank=True, null=True)
 
     class Meta:
         unique_together = ('brand', 'name') # A brand can't have two models with the same name
@@ -140,64 +88,12 @@ class Product(models.Model):
         return f"{self.name} ({self.code})" # Include code in string representation
 
 # --- Phone (Child Class) ---
-class PhoneImage(models.Model):
-    """Model for storing multiple images for a phone"""
-    phone = models.ForeignKey('Phone', on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to='phone_images/')
-    is_primary = models.BooleanField(default=False)
-    color_variant = models.CharField(max_length=50, blank=True, null=True)
-    sort_order = models.PositiveIntegerField(default=0)
-    source_url = models.URLField(max_length=255, blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        ordering = ['sort_order', 'created_at']
-    
-    def __str__(self):
-        return f"Image for {self.phone.name} ({self.id})"
-
-
 class Phone(Product):
     model = models.ForeignKey(Model, on_delete=models.CASCADE, related_name='phones') # Link to Model
-    # Basic specifications
     processor = models.CharField(max_length=100, blank=True, null=True)
     ram_gb = models.PositiveIntegerField(blank=True, null=True)
     storage_gb = models.PositiveIntegerField(blank=True, null=True)
     screen_size_inch = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
-    
-    # Additional physical specifications
-    dimensions = models.CharField(max_length=100, blank=True, null=True)  # e.g. "146.7 x 71.5 x 7.4 mm"
-    weight_g = models.PositiveIntegerField(blank=True, null=True)  # Weight in grams
-    build_materials = models.CharField(max_length=200, blank=True, null=True)  # e.g. "Glass front, aluminum frame"
-    sim_type = models.CharField(max_length=100, blank=True, null=True)  # e.g. "Nano-SIM, eSIM"
-    ip_rating = models.CharField(max_length=20, blank=True, null=True)  # e.g. "IP68"
-    
-    def save(self, *args, **kwargs):
-        # Auto-generate name based on model if it's a new object
-        if not self.pk:  # Only when creating, not updating
-            model_name = self.model.name if self.model else ""
-            brand_name = self.model.brand.name if self.model and self.model.brand else ""
-            additional_name = self.name or ""
-            
-            # If name is empty or matches exactly the model name, generate a new one
-            if not additional_name or additional_name == model_name:
-                # Use storage and color if available to create a more specific name
-                specs = []
-                if self.storage_gb:
-                    specs.append(f"{self.storage_gb}GB")
-                if hasattr(self, 'color') and self.color:
-                    specs.append(self.color)
-                    
-                specs_str = " ".join(specs)
-                if specs_str:
-                    self.name = f"{brand_name} {model_name} {specs_str}".strip()
-                else:
-                    self.name = f"{brand_name} {model_name}".strip()
-            elif brand_name and model_name and brand_name not in additional_name:
-                # If name doesn't already include brand and model, prepend them
-                self.name = f"{brand_name} {model_name} {additional_name}".strip()
-                
-        super().save(*args, **kwargs)
 
     SCREEN_TYPE_CHOICES = (
         ('oled', 'OLED'),
@@ -246,39 +142,6 @@ class Phone(Product):
     phone_type = models.CharField(max_length=50, choices=PHONE_TYPE_CHOICES, default='ordinary')
 
 
-    # Additional display specifications
-    resolution = models.CharField(max_length=100, blank=True, null=True)  # e.g. "1080 x 2400 pixels"
-    pixel_density = models.PositiveIntegerField(blank=True, null=True)  # PPI
-    refresh_rate = models.PositiveIntegerField(blank=True, null=True)  # Hz
-    max_brightness = models.PositiveIntegerField(blank=True, null=True)  # nits
-    hdr_support = models.BooleanField(default=False)
-    
-    # Additional camera specifications
-    main_camera_features = models.TextField(blank=True, null=True)  # e.g. "OIS, PDAF, Night mode"
-    selfie_camera_features = models.TextField(blank=True, null=True)
-    video_recording = models.CharField(max_length=100, blank=True, null=True)  # e.g. "4K@60fps, 1080p@240fps"
-    
-    # Connectivity
-    wifi = models.CharField(max_length=100, blank=True, null=True)  # e.g. "Wi-Fi 802.11 a/b/g/n/ac/6"
-    bluetooth = models.CharField(max_length=50, blank=True, null=True)  # e.g. "5.2, A2DP, LE"
-    gps = models.CharField(max_length=100, blank=True, null=True)  # e.g. "GPS, GLONASS, GALILEO, BDS"
-    nfc = models.BooleanField(default=False)
-    radio = models.BooleanField(default=False)
-    usb_type = models.CharField(max_length=50, blank=True, null=True)  # e.g. "USB Type-C 3.1"
-    
-    # Battery and charging
-    battery_type = models.CharField(max_length=50, blank=True, null=True)  # e.g. "Li-Po"
-    fast_charging = models.CharField(max_length=50, blank=True, null=True)  # e.g. "27W wired"
-    wireless_charging = models.CharField(max_length=50, blank=True, null=True)  # e.g. "15W"
-    
-    # Additional features
-    fingerprint = models.CharField(max_length=100, blank=True, null=True)  # e.g. "under display, optical"
-    additional_sensors = models.CharField(max_length=200, blank=True, null=True)  # e.g. "accelerometer, gyro, proximity"
-    
-    # External data
-    gsmarena_url = models.URLField(max_length=255, blank=True, null=True)
-    other_urls = models.JSONField(default=dict, blank=True, null=True)  # Store additional reference URLs
-    
     # Add other phone-specific specs as needed
 
     def save(self, *args, **kwargs):
@@ -289,18 +152,6 @@ class Phone(Product):
     def __str__(self):
         # Include code from the base Product model and new fields
         return f"Phone: {self.name} ({self.code}) ({self.get_condition_display()}) - {self.get_version_display()} - {self.get_phone_type_display()}"
-    
-    def get_primary_image(self):
-        """Returns the primary image for this phone"""
-        primary = self.images.filter(is_primary=True).first()
-        if primary:
-            return primary.image
-        # Fallback to first image if no primary is set
-        first_image = self.images.first()
-        if first_image:
-            return first_image.image
-        # Fallback to the product photo if no images exist
-        return self.photo
 
 # --- Accessory (Child Class) ---
 class Accessory(Product):
@@ -359,31 +210,6 @@ class Stock(models.Model):
 
     def __str__(self):
         return f"{self.product.name} ({self.product.code}): {self.quantity} in stock" # Include code
-
-
-
-
-# --- CaisseOperation Model ---
-OPERATION_TYPE_CHOICES = (
-    ('DEPOSIT', 'Deposit'),
-    ('WITHDRAWAL', 'Withdrawal'),
-    ('SALE', 'Sale'),
-    ('PURCHASE_PAYMENT', 'Purchase Payment'),
-    ('ADJUSTMENT', 'Balance Adjustment'),
-)
-
-class CaisseOperation(models.Model):
-    caisse = models.ForeignKey("api.Caisse", on_delete=models.CASCADE, related_name='operations')
-    operation_type = models.CharField(max_length=20, choices=OPERATION_TYPE_CHOICES)
-    amount = models.DecimalField(max_digits=12, decimal_places=2)  # Can be positive (deposit) or negative (withdrawal)
-    balance_after = models.DecimalField(max_digits=12, decimal_places=2)  # Balance after this operation
-    description = models.TextField(blank=True, null=True)
-    reference_id = models.CharField(max_length=100, blank=True, null=True)  # For linking to sales/purchases
-    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    
-    def __str__(self):
-        return f"{self.operation_type} of {abs(self.amount)} on {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
 # --- Caisse (Cash Register) Model ---
 class Caisse(models.Model):

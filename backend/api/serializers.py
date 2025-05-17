@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
-    Brand, Model, Product, Phone, Accessory, 
+    Brand, Model, Product, Phone, PhoneImage, Accessory, 
     Stock, Sale, SaleItem, Invoice, SALE_TYPES,
-    Supplier, Purchase, PurchaseItem, PAYMENT_STATUS_CHOICES, PAYMENT_METHOD_CHOICES
+    Supplier, Purchase, PurchaseItem, PAYMENT_STATUS_CHOICES, PAYMENT_METHOD_CHOICES,
+    Caisse, CaisseOperation
 )
 
 # User Serializer
@@ -51,6 +52,19 @@ class ProductSerializer(serializers.ModelSerializer):
         except Stock.DoesNotExist:
             return 0
 
+# PhoneImage Serializer
+class PhoneImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PhoneImage
+        fields = ['id', 'phone', 'image', 'is_primary', 'color_variant', 'sort_order', 'source_url', 'created_at']
+        read_only_fields = ['created_at']
+
+# Phone Image List Serializer (simplified for use in PhoneSerializer)
+class PhoneImageListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PhoneImage
+        fields = ['id', 'image', 'is_primary', 'color_variant']
+
 # Phone Serializer
 class PhoneSerializer(serializers.ModelSerializer):
     brand_name = serializers.ReadOnlyField(source='brand.name')
@@ -60,6 +74,7 @@ class PhoneSerializer(serializers.ModelSerializer):
     version_display = serializers.CharField(source='get_version_display', read_only=True)
     phone_type_display = serializers.CharField(source='get_phone_type_display', read_only=True)
     screen_type_display = serializers.CharField(source='get_screen_type_display', read_only=True)
+    images = PhoneImageListSerializer(many=True, read_only=True)
     
     # Explicitly define choice fields to use the choices from the model
     condition = serializers.ChoiceField(choices=Phone.CONDITION_CHOICES)
@@ -129,12 +144,13 @@ class SaleSerializer(serializers.ModelSerializer):
 
 # Invoice Serializer
 class InvoiceSerializer(serializers.ModelSerializer):
-    sale_info = SaleSerializer(source='sale', read_only=True)
-    
+    sale = SaleSerializer(read_only=True)
+    sale_id = serializers.IntegerField(write_only=True)
+
     class Meta:
         model = Invoice
-        fields = '__all__'
-        read_only_fields = ('sale', 'invoice_date', 'total_amount')
+        fields = ['id', 'invoice_number', 'sale', 'sale_id', 'invoice_date', 'total_amount', 'customer_info']
+        read_only_fields = ['invoice_number']
 
 # Serializer for recording a sale with multiple items
 class RecordSaleSerializer(serializers.Serializer):
@@ -307,3 +323,49 @@ class CreatePurchaseSerializer(serializers.Serializer):
             })
         
         return validated_items
+
+# Caisse Serializers
+class CaisseOperationSerializer(serializers.ModelSerializer):
+    performed_by_username = serializers.CharField(source='performed_by.username', read_only=True)
+    caisse_name = serializers.CharField(source='caisse.name', read_only=True)
+    operation_type_display = serializers.CharField(source='get_operation_type_display', read_only=True)
+    
+    class Meta:
+        model = CaisseOperation
+        fields = ['id', 'caisse', 'caisse_name', 'operation_type', 'operation_type_display', 'amount', 
+                 'balance_after', 'description', 'reference_id', 'performed_by', 
+                 'performed_by_username', 'timestamp']
+        read_only_fields = ['caisse_name', 'performed_by_username', 'balance_after', 'timestamp']
+
+
+class CaisseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Caisse
+        fields = ['id', 'name', 'current_balance', 'last_updated', 'created_at']
+        read_only_fields = ['current_balance', 'last_updated', 'created_at']
+
+
+class CaisseDetailSerializer(serializers.ModelSerializer):
+    operations = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Caisse
+        fields = ['id', 'name', 'current_balance', 'last_updated', 'created_at', 'operations']
+        read_only_fields = ['current_balance', 'last_updated', 'created_at', 'operations']
+    
+    def get_operations(self, obj):
+        # Get the 10 most recent operations by default
+        operations = obj.operations.order_by('-timestamp')[:10]
+        return CaisseOperationSerializer(operations, many=True).data
+
+
+class CaisseDepositSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0.01)
+    description = serializers.CharField(max_length=255, required=False, 
+                                      default="Manual deposit")
+
+
+class CaisseWithdrawalSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0.01)
+    description = serializers.CharField(max_length=255, required=False, 
+                                      default="Manual withdrawal")
