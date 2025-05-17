@@ -54,7 +54,7 @@ class Model(models.Model):
     body_weight = models.CharField(max_length=50, blank=True, null=True)
     body_build = models.CharField(max_length=200, blank=True, null=True)
     body_sim = models.CharField(max_length=100, blank=True, null=True)
-    body_water_resistant = models.CharField(max_length=100, blank=True, null=True)
+    bodyother = models.CharField(max_length=100, blank=True, null=True)
     
     # Display
     display_type = models.CharField(max_length=200, blank=True, null=True)
@@ -76,7 +76,6 @@ class Model(models.Model):
     selfie_camera = models.CharField(max_length=500, blank=True, null=True)
     
     # Sound
-    sound_loudspeaker = models.CharField(max_length=100, blank=True, null=True)
     sound_jack = models.CharField(max_length=100, blank=True, null=True)
     
     # Communications
