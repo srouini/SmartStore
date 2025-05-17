@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import purchaseService from '../api/purchaseService';
 import type { Purchase } from '../api/purchaseService';
-import supplierService from '../api/supplierService';
+import supplierService, { PaginatedResponse } from '../api/supplierService';
 import phoneService from '../api/phoneService';
 import type { Phone } from '../api/phoneService';
 import accessoryService from '../api/accessoryService';
@@ -11,6 +11,7 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import PurchaseFormModal from '../components/purchases/PurchaseFormModal';
 import PurchaseViewModal from '../components/purchases/PurchaseViewModal';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 const Purchases: React.FC = () => {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -23,6 +24,14 @@ const Purchases: React.FC = () => {
   const ensuredPhones = Array.isArray(phones) ? phones : [];
   const ensuredAccessories = Array.isArray(accessories) ? accessories : [];
   const ensuredSuppliers = Array.isArray(suppliers) ? suppliers : [];
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,15 +71,45 @@ const Purchases: React.FC = () => {
     fetchSuppliers();
   }, []);
 
+  // Effect to refetch when page changes
+  useEffect(() => {
+    if (!isLoading) {
+      fetchPurchases();
+    }
+  }, [currentPage, pageSize]);
+
   const fetchPurchases = async (params?: Record<string, any>) => {
     try {
       setIsLoading(true);
-      const data = await purchaseService.getAllPurchases(params);
-      setPurchases(data);
+      
+      // Add pagination parameters
+      const paginationParams = {
+        ...params,
+        page: currentPage,
+        page_size: pageSize
+      };
+      
+      const data = await purchaseService.getAllPurchases(paginationParams);
+      
+      // Handle paginated response if available
+      if (data && typeof data === 'object' && 'results' in data) {
+        setPurchases(data.results);
+        setTotalItems(data.count);
+        setHasNextPage(!!data.next);
+        setHasPrevPage(!!data.previous);
+        setTotalPages(Math.ceil(data.count / pageSize));
+      } else {
+        // Fallback for non-paginated response
+        setPurchases(Array.isArray(data) ? data : []);
+        setTotalItems(Array.isArray(data) ? data.length : 0);
+        setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+      }
+      
       setError(null);
     } catch (err: any) {
       console.error('Error fetching purchases:', err);
       setError('Failed to load purchases. Please try again.');
+      setPurchases([]);
     } finally {
       setIsLoading(false);
     }
@@ -97,9 +136,17 @@ const Purchases: React.FC = () => {
   const fetchSuppliers = async () => {
     try {
       const data = await supplierService.getAllSuppliers();
-      setSuppliers(data);
+      
+      // Handle paginated response
+      if (data && typeof data === 'object' && 'results' in data) {
+        setSuppliers(data.results);
+      } else {
+        // Fallback for non-paginated response
+        setSuppliers(Array.isArray(data) ? data : []);
+      }
     } catch (err: any) {
       console.error('Error fetching suppliers:', err);
+      setSuppliers([]);
     }
   };
 
@@ -158,20 +205,35 @@ const Purchases: React.FC = () => {
   };
 
   const handleSearch = () => {
-    if (!searchQuery) {
+    if (!searchQuery.trim()) {
+      // If search query is empty, fetch all purchases
       fetchPurchases();
       return;
     }
-    
-    purchaseService.searchByReferenceNumber(searchQuery)
+
+    setIsLoading(true);
+    purchaseService.searchByReferenceNumber(searchQuery, currentPage, pageSize)
       .then(data => {
-        setPurchases(data);
+        if (data && typeof data === 'object' && 'results' in data) {
+          setPurchases(data.results);
+          setTotalItems(data.count);
+          setHasNextPage(!!data.next);
+          setHasPrevPage(!!data.previous);
+          setTotalPages(Math.ceil(data.count / pageSize));
+        } else {
+          // Fallback for non-paginated response
+          setPurchases(Array.isArray(data) ? data : []);
+          setTotalItems(Array.isArray(data) ? data.length : 0);
+          setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+        }
         setError(null);
       })
       .catch(err => {
         console.error('Error searching purchases:', err);
-        setError('Search failed. Please try again.');
-      });
+        setError('Failed to search purchases. Please try again.');
+        setPurchases([]);
+      })
+      .finally(() => setIsLoading(false));
   };
 
   const handleDateFilter = () => {
@@ -180,15 +242,29 @@ const Purchases: React.FC = () => {
       return;
     }
     
-    purchaseService.getByDateRange(startDate, endDate)
+    setIsLoading(true);
+    purchaseService.getByDateRange(startDate, endDate, currentPage, pageSize)
       .then(data => {
-        setPurchases(data);
+        if (data && typeof data === 'object' && 'results' in data) {
+          setPurchases(data.results);
+          setTotalItems(data.count);
+          setHasNextPage(!!data.next);
+          setHasPrevPage(!!data.previous);
+          setTotalPages(Math.ceil(data.count / pageSize));
+        } else {
+          // Fallback for non-paginated response
+          setPurchases(Array.isArray(data) ? data : []);
+          setTotalItems(Array.isArray(data) ? data.length : 0);
+          setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+        }
         setError(null);
       })
       .catch(err => {
         console.error('Error filtering purchases by date:', err);
         setError('Date filter failed. Please try again.');
-      });
+        setPurchases([]);
+      })
+      .finally(() => setIsLoading(false));
   };
 
   const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -196,15 +272,29 @@ const Purchases: React.FC = () => {
     setPaymentStatus(value);
     
     if (value) {
-      purchaseService.getByPaymentStatus(value)
+      setIsLoading(true);
+      purchaseService.getByPaymentStatus(value, currentPage, pageSize)
         .then(data => {
-          setPurchases(data);
+          if (data && typeof data === 'object' && 'results' in data) {
+            setPurchases(data.results);
+            setTotalItems(data.count);
+            setHasNextPage(!!data.next);
+            setHasPrevPage(!!data.previous);
+            setTotalPages(Math.ceil(data.count / pageSize));
+          } else {
+            // Fallback for non-paginated response
+            setPurchases(Array.isArray(data) ? data : []);
+            setTotalItems(Array.isArray(data) ? data.length : 0);
+            setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+          }
           setError(null);
         })
         .catch(err => {
           console.error('Error filtering purchases by status:', err);
           setError('Status filter failed. Please try again.');
-        });
+          setPurchases([]);
+        })
+        .finally(() => setIsLoading(false));
     } else {
       fetchPurchases();
     }
@@ -337,6 +427,81 @@ const Purchases: React.FC = () => {
           isLoading={isLoading} 
           onRowClick={handleViewPurchase}
         />
+        
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between border-t border-base-200 bg-base-100 px-4 py-3 sm:px-6">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={!hasPrevPage}
+              className={`relative inline-flex items-center rounded-md border border-base-300 bg-base-100 px-4 py-2 text-sm font-medium ${!hasPrevPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              disabled={!hasNextPage}
+              className={`relative ml-3 inline-flex items-center rounded-md border border-base-300 bg-base-100 px-4 py-2 text-sm font-medium ${!hasNextPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+            >
+              Next
+            </button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing <span className="font-medium">{ensuredPurchases.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> to{' '}
+                <span className="font-medium">
+                  {Math.min(currentPage * pageSize, totalItems)}
+                </span> of{' '}
+                <span className="font-medium">{totalItems}</span> results
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={!hasPrevPage}
+                  className={`relative inline-flex items-center rounded-l-md px-2 py-2 ${!hasPrevPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+                >
+                  <span className="sr-only">Previous</span>
+                  <FiChevronLeft className="h-5 w-5" aria-hidden="true" />
+                </button>
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Show pages around current page
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === pageNum ? 'z-10 bg-primary text-primary-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : 'text-base-content ring-1 ring-inset ring-base-300 hover:bg-base-200 focus:outline-offset-0'}`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={!hasNextPage}
+                  className={`relative inline-flex items-center rounded-r-md px-2 py-2 ${!hasNextPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+                >
+                  <span className="sr-only">Next</span>
+                  <FiChevronRight className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
       </Card>
 
       {/* Purchase Form Modal */}

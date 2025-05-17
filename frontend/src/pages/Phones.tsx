@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import phoneService from '../api/phoneService';
 import type { Phone } from '../api/phoneService';
-import brandService from '../api/brandService';
-import type { Brand } from '../api/brandService';
-import modelService from '../api/modelService';
-import type { Model } from '../api/modelService';
+import { useBrands, useModels } from '../contexts/BrandModelContext';
 import Table from '../components/common/Table';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
@@ -37,17 +34,15 @@ interface PhoneFormData {
   phone_type: string;
   photo?: FileList;
 }
+
 import PhoneModal from '../components/modals/PhoneModal';
+import PhoneImportModal from '../components/modals/PhoneImportModal';
 
 const Phones: React.FC = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
-  
-  // Ensure brands and models are always arrays
-  const ensuredBrands = Array.isArray(brands) ? brands : [];
-  const ensuredModels = Array.isArray(models) ? models : [];
-  
+  const brands = useBrands();
+  const models = useModels();
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -55,9 +50,10 @@ const Phones: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<Phone | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<number | null>(null);
@@ -65,11 +61,9 @@ const Phones: React.FC = () => {
 
   const { register, reset, watch, setValue, formState: { errors } } = useForm<Phone>();
 
-  // Fetch phones, brands, and models on component mount
+  // Fetch phones on component mount
   useEffect(() => {
     fetchPhones();
-    fetchBrands();
-    fetchModels();
   }, []);
 
   // Effect to refetch when page changes
@@ -79,9 +73,6 @@ const Phones: React.FC = () => {
     }
   }, [currentPage, pageSize]);
 
-  // We no longer need to filter models based on brand as we're showing all models
-  // and letting the user select directly from the full list
-  
   // Auto-populate phone name when model changes
   const watchedModel = watch('model');
   useEffect(() => {
@@ -89,12 +80,10 @@ const Phones: React.FC = () => {
       const modelId = parseInt(watchedModel.toString());
       const selectedModel = models.find(model => model.id === modelId);
       const selectedBrand = brands.find(brand => brand.id === selectedModel?.brand);
-      
       if (selectedModel && selectedBrand) {
         // Auto-populate the name field with brand and model names
         const autoName = `${selectedBrand.name} ${selectedModel.name}`;
         setValue('name', autoName);
-        
         // If we have the model, we know the brand, so set it automatically
         setValue('brand', selectedModel.brand);
       }
@@ -104,16 +93,16 @@ const Phones: React.FC = () => {
   const fetchPhones = async (params?: Record<string, any>) => {
     try {
       setIsLoading(true);
-      
+
       // Add pagination parameters
       const paginationParams = {
         ...params,
         page: currentPage,
         page_size: pageSize
       };
-      
+
       const data = await phoneService.getAllPhones(paginationParams);
-      
+
       // Handle paginated response if available
       if (data && typeof data === 'object' && 'results' in data) {
         setPhones(data.results);
@@ -127,7 +116,7 @@ const Phones: React.FC = () => {
         setTotalItems(Array.isArray(data) ? data.length : 0);
         setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
       }
-      
+
       setError(null);
     } catch (err: any) {
       console.error('Error fetching phones:', err);
@@ -135,44 +124,6 @@ const Phones: React.FC = () => {
       setPhones([]);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchBrands = async () => {
-    try {
-      const data = await brandService.getAllBrands();
-      // Check if data is an array or if it has results property
-      if (Array.isArray(data)) {
-        setBrands(data);
-      } else if (data && typeof data === 'object' && 'results' in data) {
-        setBrands(data.results);
-      } else {
-        // If neither, set an empty array
-        console.warn('Unexpected format for brands data:', data);
-        setBrands([]);
-      }
-    } catch (err: any) {
-      console.error('Error fetching brands:', err);
-      setBrands([]);
-    }
-  };
-
-  const fetchModels = async () => {
-    try {
-      const data = await modelService.getAllModels();
-      // Check if data is an array or if it has results property
-      if (Array.isArray(data)) {
-        setModels(data);
-      } else if (data && typeof data === 'object' && 'results' in data) {
-        setModels(data.results);
-      } else {
-        // If neither, set an empty array
-        console.warn('Unexpected format for models data:', data);
-        setModels([]);
-      }
-    } catch (err: any) {
-      console.error('Error fetching models:', err);
-      setModels([]);
     }
   };
 
@@ -426,9 +377,12 @@ const Phones: React.FC = () => {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Phones</h1>
-        <Button onClick={handleCreatePhone}>Add Phone</Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsImportModalOpen(true)} variant="outline">Import from GSMArena</Button>
+          <Button onClick={handleCreatePhone}>Add Phone</Button>
+        </div>
       </div>
 
       {error && (
@@ -442,15 +396,25 @@ const Phones: React.FC = () => {
           <label className="label">
             <span className="label-text">Filter by Brand</span>
           </label>
+       
+          {/* Debugging info */}
+          <div className="text-xs opacity-50 mb-1">
+            Available brands: {brands.length}
+          </div>
+          
           <select 
             className="select select-bordered" 
             value={selectedBrand || ''}
             onChange={handleBrandFilterChange}
           >
             <option value="">All Brands</option>
-            {ensuredBrands.map(brand => (
-              <option key={brand.id} value={brand.id}>{brand.name}</option>
-            ))}
+            {brands.map((brand, index) => {
+              // Log each brand to see what's being processed
+              console.log(`Brand ${index}:`, brand);
+              return (
+                <option key={brand.id} value={brand.id}>{brand.name}</option>
+              );
+            })}
           </select>
         </div>
 
@@ -545,6 +509,12 @@ const Phones: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handlePhoneSubmit}
         editingPhone={editingPhone}
+      />
+
+      <PhoneImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handlePhoneSubmit}
       />
     </div>
   );

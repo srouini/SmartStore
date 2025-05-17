@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
@@ -17,14 +17,19 @@ const BrandModal: React.FC<BrandModalProps> = ({
   onSubmit, 
   editingBrand 
 }) => {
-  const { register, handleSubmit, formState: { errors } } = useForm<Brand>({
-    defaultValues: {
-      name: editingBrand?.name || '',
-      origin_country: editingBrand?.origin_country || '',
-      website: editingBrand?.website || '',
-      description: editingBrand?.description || ''
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<Brand>();
+  
+  // Reset form when modal opens/closes or editing brand changes
+  useEffect(() => {
+    if (isOpen) {
+      reset({
+        name: editingBrand?.name || '',
+        origin_country: editingBrand?.origin_country || '',
+        website: editingBrand?.website || '',
+        description: editingBrand?.description || ''
+      });
     }
-  });
+  }, [isOpen, editingBrand, reset]);
 
   return (
     <Modal
@@ -94,12 +99,25 @@ const BrandModal: React.FC<BrandModalProps> = ({
           <label className="label">
             <span className="label-text">Logo</span>
           </label>
+          {editingBrand?.picture && (
+            <div className="mb-2">
+              <p className="text-sm mb-1">Current logo:</p>
+              <img 
+                src={editingBrand.picture} 
+                alt="Current logo" 
+                className="h-16 w-16 object-contain border rounded-lg"
+              />
+            </div>
+          )}
           <input
             type="file"
             className="file-input file-input-bordered w-full"
             accept="image/*"
             {...register('picture')}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {editingBrand ? 'Leave empty to keep current logo' : 'Upload a logo image'}
+          </p>
         </div>
       </form>
     </Modal>

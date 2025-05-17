@@ -1,4 +1,5 @@
 import api from './axios';
+import { PaginatedResponse } from './supplierService';
 
 export interface SaleItem {
   id: number;
@@ -42,7 +43,7 @@ const saleService = {
   // Get all sales
   getAllSales: async (params?: Record<string, any>) => {
     try {
-      const response = await api.get('sales/', { params });
+      const response = await api.get<PaginatedResponse<Sale>>('sales/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -70,9 +71,13 @@ const saleService = {
   },
 
   // Get sales by date range
-  getSalesByDateRange: async (startDate: string, endDate: string) => {
+  getSalesByDateRange: async (startDate: string, endDate: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`sales/?start_date=${startDate}&end_date=${endDate}`);
+      const params: Record<string, any> = { start_date: startDate, end_date: endDate };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Sale>>('sales/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -80,9 +85,13 @@ const saleService = {
   },
 
   // Get sales by type
-  getSalesByType: async (saleType: 'bulk' | 'semi-bulk' | 'particular') => {
+  getSalesByType: async (saleType: 'bulk' | 'semi-bulk' | 'particular', page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`sales/?sale_type=${saleType}`);
+      const params: Record<string, any> = { sale_type: saleType };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Sale>>('sales/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -90,9 +99,13 @@ const saleService = {
   },
 
   // Get sales by user
-  getSalesByUser: async (userId: number) => {
+  getSalesByUser: async (userId: number, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`sales/?sold_by=${userId}`);
+      const params: Record<string, any> = { sold_by: userId };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Sale>>('sales/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -100,9 +113,13 @@ const saleService = {
   },
 
   // Get sales with invoices
-  getSalesWithInvoices: async () => {
+  getSalesWithInvoices: async (page?: number, pageSize?: number) => {
     try {
-      const response = await api.get('sales/?has_invoice=true');
+      const params: Record<string, any> = { has_invoice: true };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Sale>>('sales/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -110,9 +127,13 @@ const saleService = {
   },
 
   // Get sales by customer name
-  getSalesByCustomer: async (customerName: string) => {
+  getSalesByCustomer: async (customerName: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`sales/?customer=${customerName}`);
+      const params: Record<string, any> = { customer: customerName };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Sale>>('sales/', { params });
       return response.data;
     } catch (error) {
       throw error;

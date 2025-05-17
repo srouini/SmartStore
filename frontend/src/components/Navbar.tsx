@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ThemeSwitcher from './common/ThemeSwitcher';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -39,10 +40,13 @@ const Navbar: React.FC = () => {
               <li><Link to="/suppliers" onClick={() => setIsMenuOpen(false)}>Suppliers</Link></li>
               <li><Link to="/purchases" onClick={() => setIsMenuOpen(false)}>Purchases</Link></li>
               <li><Link to="/sales" onClick={() => setIsMenuOpen(false)}>Sales</Link></li>
+              <li><Link to="/caisse" onClick={() => setIsMenuOpen(false)}>Cash Register</Link></li>
             </ul>
           )}
         </div>
-        <Link to="/" className="btn btn-ghost normal-case text-xl">SmartStore</Link>
+        <Link to="/" className="btn btn-ghost normal-case text-xl flex items-center gap-2">
+          <span>VoltLink</span>
+        </Link>
       </div>
       <div className="navbar-center hidden lg:flex">
         <ul className="menu menu-horizontal px-1">
@@ -53,9 +57,12 @@ const Navbar: React.FC = () => {
           <li><Link to="/suppliers">Suppliers</Link></li>
           <li><Link to="/purchases">Purchases</Link></li>
           <li><Link to="/sales">Sales</Link></li>
+          <li><Link to="/caisse">Cash Register</Link></li>
         </ul>
       </div>
-      <div className="navbar-end">
+      <div className="navbar-end flex items-center gap-2">
+        <ThemeSwitcher />
+        
         {user ? (
           <div className="dropdown dropdown-end">
             <div tabIndex={0} role="button" className="btn btn-ghost">

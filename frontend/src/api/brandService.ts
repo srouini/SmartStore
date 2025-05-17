@@ -61,7 +61,9 @@ const brandService = {
   // Update brand
   updateBrand: async (id: number, brandData: FormData) => {
     try {
-      const response = await api.put(`brands/${id}/`, brandData, {
+      // Use PATCH instead of PUT to allow partial updates
+      // This prevents clearing the image when none is provided
+      const response = await api.patch(`brands/${id}/`, brandData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

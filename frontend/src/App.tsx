@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import AuthContext, { AuthProvider } from './contexts/AuthContext';
+import { BrandModelProvider } from './contexts/BrandModelContext';
+import { SupplierProvider } from './contexts/SupplierContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -11,6 +13,7 @@ import Models from './pages/Models';
 import Purchases from './pages/Purchases';
 import Suppliers from './pages/Suppliers';
 import Sales from './pages/Sales';
+import Caisse from './pages/Caisse';
 
 // Import CSS
 import './index.css';
@@ -18,6 +21,8 @@ import './index.css';
 function App() {
   return (
     <AuthProvider>
+    <BrandModelProvider>
+    <SupplierProvider>
       <Router>
         <div className="min-h-screen flex flex-col">
           <Routes>
@@ -35,6 +40,7 @@ function App() {
                 <Route path="/purchases" element={<Purchases />} />
                 <Route path="/suppliers" element={<Suppliers />} />
                 <Route path="/sales" element={<Sales />} />
+                <Route path="/caisse" element={<Caisse />} />
               </Route>
             </Route>
             
@@ -43,7 +49,9 @@ function App() {
           </Routes>
         </div>
       </Router>
-    </AuthProvider>
+        </SupplierProvider>
+        </BrandModelProvider>
+</AuthProvider>
   );
 }
 
@@ -60,12 +68,14 @@ function Layout() {
           <Route path="/brands" element={<Brands />} />
           <Route path="/models" element={<Models />} />
           <Route path="/purchases" element={<Purchases />} />
+          <Route path="/suppliers" element={<Suppliers />} />
           <Route path="/sales" element={<Sales />} />
+          <Route path="/caisse" element={<Caisse />} />
         </Routes>
       </main>
       <footer className="footer footer-center p-4 bg-base-300 text-base-content">
         <div>
-          <p>Copyright © {new Date().getFullYear()} - SmartStore</p>
+          <p>Copyright © {new Date().getFullYear()} - VoltLink</p>
         </div>
       </footer>
     </>

@@ -16,6 +16,20 @@ interface TableProps {
 const Table: React.FC<TableProps> = ({ columns, data, isLoading = false, onRowClick }) => {
   // Ensure data is an array
   const tableData = Array.isArray(data) ? data : [];
+  
+  // Debug information
+  console.log('Table component received:', { 
+    columnsCount: columns.length, 
+    dataProvided: data, 
+    isArray: Array.isArray(data),
+    tableDataLength: tableData.length,
+    isLoading
+  });
+  
+  if (tableData.length > 0) {
+    console.log('First row data:', tableData[0]);
+  }
+  
   if (isLoading) {
     return (
       <div className="w-full overflow-x-auto">
@@ -66,21 +80,30 @@ const Table: React.FC<TableProps> = ({ columns, data, isLoading = false, onRowCl
           </tr>
         </thead>
         <tbody>
-          {tableData.map((item, index) => (
-            <tr 
-              key={index} 
-              className={onRowClick ? "hover:bg-base-200 cursor-pointer" : ""}
-              onClick={onRowClick ? () => onRowClick(item) : undefined}
-            >
-              {columns.map((column, colIndex) => (
-                <td key={colIndex}>
-                  {column.render 
-                    ? column.render(item[column.accessor], item) 
-                    : item[column.accessor] || '-'}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {tableData.map((item, index) => {
+            console.log(`Rendering row ${index}:`, item);
+            return (
+              <tr 
+                key={index} 
+                className={onRowClick ? "hover:bg-base-200 cursor-pointer" : ""}
+                onClick={onRowClick ? () => onRowClick(item) : undefined}
+              >
+                {columns.map((column, colIndex) => {
+                  // Safely access the property using the accessor
+                  const value = item && column.accessor in item ? item[column.accessor] : undefined;
+                  console.log(`Row ${index}, Column ${colIndex} (${column.accessor}):`, { value, item });
+                  
+                  return (
+                    <td key={colIndex}>
+                      {column.render 
+                        ? column.render(value, item) 
+                        : (value !== undefined && value !== null ? value : '-')}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

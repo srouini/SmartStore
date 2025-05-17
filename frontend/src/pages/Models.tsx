@@ -1,14 +1,77 @@
 import React, { useState, useEffect } from 'react';
 import modelService from '../api/modelService';
-import type { Model } from '../api/modelService';
 import brandService from '../api/brandService';
 import type { Brand } from '../api/brandService';
+
+// Extended Model interface with all new specification fields
+interface Model {
+  id?: number;
+  name: string;
+  brand: number | Brand;
+  brand_name?: string;
+  description?: string;
+  release_date?: string;
+  
+  // Network
+  network_technology?: string;
+  
+  // Launch
+  launch_announced?: string;
+  launch_status?: string;
+  
+  // Body
+  body_dimensions?: string;
+  body_weight?: string;
+  body_build?: string;
+  body_sim?: string;
+  body_water_resistant?: string;
+  
+  // Display
+  display_type?: string;
+  display_size?: string;
+  display_resolution?: string;
+  
+  // Platform
+  platform_os?: string;
+  platform_chipset?: string;
+  platform_cpu?: string;
+  platform_gpu?: string;
+  
+  // Memory
+  memory_card_slot?: string;
+  memory_internal?: string;
+  
+  // Camera
+  main_camera?: string;
+  selfie_camera?: string;
+  
+  // Sound
+  sound_loudspeaker?: string;
+  sound_jack?: string;
+  
+  // Communications
+  comms_nfc?: string;
+  comms_infrared_port?: string;
+  comms_usb?: string;
+  
+  // Features
+  features_sensors?: string;
+  
+  // Battery
+  battery_type?: string;
+  battery_charging?: string;
+  
+  // Misc
+  misc_colors?: string;
+}
 import Table from '../components/common/Table';
 import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import { useForm } from 'react-hook-form';
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiTrash2 } from 'react-icons/fi';
+import { TbEdit } from 'react-icons/tb';
+import { MdPlaylistRemove } from 'react-icons/md';
 
 const Models: React.FC = () => {
   const [models, setModels] = useState<Model[]>([]);
@@ -258,28 +321,27 @@ const Models: React.FC = () => {
       header: 'Actions',
       accessor: 'id',
       render: (_: any, item: Model) => (
-        <div className="flex gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+        <div className="flex space-x-2">
+          <button 
+            className="btn btn-sm btn-tertiary text-info" 
             onClick={(e) => {
               e.stopPropagation();
               handleEditModel(item);
             }}
+            title="Edit"
           >
-            Edit
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-error" 
+            <TbEdit size={20}/>
+          </button>
+          <button 
+            className="btn btn-sm btn-tertiary text-error" 
             onClick={(e) => {
               e.stopPropagation();
               handleDeleteModel(item.id);
             }}
+            title="Delete"
           >
-            Delete
-          </Button>
+            <MdPlaylistRemove size={20} />
+          </button>
         </div>
       )
     }
@@ -415,7 +477,7 @@ const Models: React.FC = () => {
           </>
         }
       >
-        <form className="space-y-4">
+        <form className="space-y-4" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '10px' }}>
           <div className="form-control">
             <label className="label">
               <span className="label-text">Brand*</span>
@@ -474,6 +536,470 @@ const Models: React.FC = () => {
               rows={3}
               {...register('description')}
             ></textarea>
+          </div>
+          
+          {/* Network Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-4">
+            <input type="checkbox" className="peer" /> 
+            <div className="collapse-title text-md font-medium">
+              Network Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Network Technology</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered"
+                  {...register('network_technology')}
+                  placeholder="e.g., GSM / HSPA / LTE / 5G"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Launch Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Launch Information
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Announced</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('launch_announced')}
+                    placeholder="e.g., 2023, October"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Status</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('launch_status')}
+                    placeholder="e.g., Available, Coming soon"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Body Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Body Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Dimensions</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('body_dimensions')}
+                    placeholder="e.g., 160.8 x 77.8 x 8.4 mm"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Weight</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('body_weight')}
+                    placeholder="e.g., 175 g"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Build</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('body_build')}
+                    placeholder="e.g., Glass front, aluminum frame"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">SIM</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('body_sim')}
+                    placeholder="e.g., Dual SIM, Nano-SIM"
+                  />
+                </div>
+              </div>
+              
+              <div className="form-control mt-2">
+                <label className="label">
+                  <span className="label-text">Water Resistance</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered"
+                  {...register('body_water_resistant')}
+                  placeholder="e.g., IP68, water resistant up to 30 minutes"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Display Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Display Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Type</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('display_type')}
+                    placeholder="e.g., AMOLED, 120Hz, HDR10+"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Size</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('display_size')}
+                    placeholder="e.g., 6.5 inches"
+                  />
+                </div>
+              </div>
+              
+              <div className="form-control mt-2">
+                <label className="label">
+                  <span className="label-text">Resolution</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered"
+                  {...register('display_resolution')}
+                  placeholder="e.g., 1080 x 2400 pixels"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Platform Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Platform Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">OS</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('platform_os')}
+                    placeholder="e.g., Android 13, iOS 16"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Chipset</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('platform_chipset')}
+                    placeholder="e.g., Snapdragon 8 Gen 2"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">CPU</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('platform_cpu')}
+                    placeholder="e.g., Octa-core (1x3.2 GHz Cortex-X3)"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">GPU</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('platform_gpu')}
+                    placeholder="e.g., Adreno 740"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Memory Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Memory Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Card Slot</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('memory_card_slot')}
+                    placeholder="e.g., microSDXC"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Internal Storage</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('memory_internal')}
+                    placeholder="e.g., 128GB 8GB RAM, 256GB 12GB RAM"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Camera Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Camera Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Main Camera</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered"
+                  rows={2}
+                  {...register('main_camera')}
+                  placeholder="e.g., 50 MP, f/1.8, 24mm (wide), 10 MP, f/2.4, 70mm (telephoto)"
+                ></textarea>
+              </div>
+              
+              <div className="form-control mt-2">
+                <label className="label">
+                  <span className="label-text">Selfie Camera</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered"
+                  rows={2}
+                  {...register('selfie_camera')}
+                  placeholder="e.g., 12 MP, f/2.2, 23mm (wide)"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          
+          {/* Sound Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Sound Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Loudspeaker</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('sound_loudspeaker')}
+                    placeholder="e.g., Yes, with stereo speakers"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">3.5mm Jack</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('sound_jack')}
+                    placeholder="e.g., No, Yes"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Communications Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Communications
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">NFC</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('comms_nfc')}
+                    placeholder="e.g., Yes, No"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Infrared Port</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('comms_infrared_port')}
+                    placeholder="e.g., Yes, No"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">USB</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('comms_usb')}
+                    placeholder="e.g., USB Type-C 2.0"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Features Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Features
+            </div>
+            <div className="collapse-content">
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Sensors</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered"
+                  rows={2}
+                  {...register('features_sensors')}
+                  placeholder="e.g., Fingerprint (under display), accelerometer, gyro, compass"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          
+          {/* Battery Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Battery Specifications
+            </div>
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Type</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('battery_type')}
+                    placeholder="e.g., Li-Po 5000 mAh, non-removable"
+                  />
+                </div>
+                
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Charging</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered"
+                    {...register('battery_charging')}
+                    placeholder="e.g., 25W wired, 15W wireless"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Misc Section */}
+          <div className="collapse collapse-arrow bg-base-200 rounded-lg mt-2">
+            <input type="checkbox" className="peer" />
+            <div className="collapse-title text-md font-medium">
+              Miscellaneous
+            </div>
+            <div className="collapse-content">
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Available Colors</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered"
+                  {...register('misc_colors')}
+                  placeholder="e.g., Black, Blue, Silver, Green"
+                />
+              </div>
+            </div>
           </div>
         </form>
       </Modal>

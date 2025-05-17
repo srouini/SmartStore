@@ -1,11 +1,19 @@
 import api from './axios';
 import { Supplier } from './purchaseService';
 
+// Define pagination types
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 const supplierService = {
-  // Get all suppliers
+  // Get all suppliers with pagination
   getAllSuppliers: async (params?: Record<string, any>) => {
     try {
-      const response = await api.get('suppliers/', { params });
+      const response = await api.get<PaginatedResponse<Supplier>>('suppliers/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -52,10 +60,14 @@ const supplierService = {
     }
   },
 
-  // Search suppliers by name
-  searchByName: async (name: string) => {
+  // Search suppliers by name with pagination
+  searchByName: async (name: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`suppliers/?name=${name}`);
+      const params: Record<string, any> = { name };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Supplier>>('suppliers/', { params });
       return response.data;
     } catch (error) {
       throw error;

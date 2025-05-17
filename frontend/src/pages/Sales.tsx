@@ -22,6 +22,15 @@ const Sales: React.FC = () => {
   const ensuredSales = Array.isArray(sales) ? sales : [];
   const ensuredPhones = Array.isArray(phones) ? phones : [];
   const ensuredAccessories = Array.isArray(accessories) ? accessories : [];
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -46,15 +55,45 @@ const Sales: React.FC = () => {
     fetchAccessories();
   }, []);
 
+  // Effect to refetch when page changes
+  useEffect(() => {
+    if (!isLoading) {
+      fetchSales();
+    }
+  }, [currentPage, pageSize]);
+
   const fetchSales = async (params?: Record<string, any>) => {
     try {
       setIsLoading(true);
-      const data = await saleService.getAllSales(params);
-      setSales(data);
+      
+      // Add pagination parameters
+      const paginationParams = {
+        ...params,
+        page: currentPage,
+        page_size: pageSize
+      };
+      
+      const data = await saleService.getAllSales(paginationParams);
+      
+      // Handle paginated response if available
+      if (data && typeof data === 'object' && 'results' in data) {
+        setSales(data.results);
+        setTotalItems(data.count);
+        setHasNextPage(!!data.next);
+        setHasPrevPage(!!data.previous);
+        setTotalPages(Math.ceil(data.count / pageSize));
+      } else {
+        // Fallback for non-paginated response
+        setSales(Array.isArray(data) ? data : []);
+        setTotalItems(Array.isArray(data) ? data.length : 0);
+        setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+      }
+      
       setError(null);
     } catch (err: any) {
       console.error('Error fetching sales:', err);
       setError('Failed to load sales. Please try again.');
+      setSales([]);
     } finally {
       setIsLoading(false);
     }
@@ -105,15 +144,29 @@ const Sales: React.FC = () => {
       return;
     }
     
-    saleService.getSalesByDateRange(startDate, endDate)
+    setIsLoading(true);
+    saleService.getSalesByDateRange(startDate, endDate, currentPage, pageSize)
       .then(data => {
-        setSales(data);
+        if (data && typeof data === 'object' && 'results' in data) {
+          setSales(data.results);
+          setTotalItems(data.count);
+          setHasNextPage(!!data.next);
+          setHasPrevPage(!!data.previous);
+          setTotalPages(Math.ceil(data.count / pageSize));
+        } else {
+          // Fallback for non-paginated response
+          setSales(Array.isArray(data) ? data : []);
+          setTotalItems(Array.isArray(data) ? data.length : 0);
+          setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+        }
         setError(null);
       })
       .catch(err => {
         console.error('Error filtering sales by date:', err);
         setError('Date filter failed. Please try again.');
-      });
+        setSales([]);
+      })
+      .finally(() => setIsLoading(false));
   };
 
   const handleTypeFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -121,35 +174,63 @@ const Sales: React.FC = () => {
     setSaleType(value);
     
     if (value) {
-      saleService.getSalesByType(value as any)
+      setIsLoading(true);
+      saleService.getSalesByType(value as any, currentPage, pageSize)
         .then(data => {
-          setSales(data);
+          if (data && typeof data === 'object' && 'results' in data) {
+            setSales(data.results);
+            setTotalItems(data.count);
+            setHasNextPage(!!data.next);
+            setHasPrevPage(!!data.previous);
+            setTotalPages(Math.ceil(data.count / pageSize));
+          } else {
+            // Fallback for non-paginated response
+            setSales(Array.isArray(data) ? data : []);
+            setTotalItems(Array.isArray(data) ? data.length : 0);
+            setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+          }
           setError(null);
         })
         .catch(err => {
           console.error('Error filtering sales by type:', err);
           setError('Type filter failed. Please try again.');
-        });
+          setSales([]);
+        })
+        .finally(() => setIsLoading(false));
     } else {
       fetchSales();
     }
   };
 
   const handleCustomerSearch = () => {
-    if (!searchQuery) {
+    if (!searchQuery.trim()) {
       fetchSales();
       return;
     }
-    
-    saleService.getSalesByCustomer(searchQuery)
+
+    setIsLoading(true);
+    saleService.getSalesByCustomer(searchQuery, currentPage, pageSize)
       .then(data => {
-        setSales(data);
+        if (data && typeof data === 'object' && 'results' in data) {
+          setSales(data.results);
+          setTotalItems(data.count);
+          setHasNextPage(!!data.next);
+          setHasPrevPage(!!data.previous);
+          setTotalPages(Math.ceil(data.count / pageSize));
+        } else {
+          // Fallback for non-paginated response
+          setSales(Array.isArray(data) ? data : []);
+          setTotalItems(Array.isArray(data) ? data.length : 0);
+          setTotalPages(Math.ceil((Array.isArray(data) ? data.length : 0) / pageSize));
+        }
         setError(null);
       })
       .catch(err => {
         console.error('Error searching sales by customer:', err);
         setError('Search failed. Please try again.');
-      });
+        setSales([]);
+      })
+      .finally(() => setIsLoading(false));
   };
 
   const columns = [
@@ -295,6 +376,85 @@ const Sales: React.FC = () => {
           isLoading={isLoading} 
           onRowClick={handleViewSale}
         />
+        
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between border-t border-base-200 bg-base-100 px-4 py-3 sm:px-6">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={!hasPrevPage}
+              className={`relative inline-flex items-center rounded-md border border-base-300 bg-base-100 px-4 py-2 text-sm font-medium ${!hasPrevPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              disabled={!hasNextPage}
+              className={`relative ml-3 inline-flex items-center rounded-md border border-base-300 bg-base-100 px-4 py-2 text-sm font-medium ${!hasNextPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+            >
+              Next
+            </button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing <span className="font-medium">{ensuredSales.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> to{' '}
+                <span className="font-medium">
+                  {Math.min(currentPage * pageSize, totalItems)}
+                </span> of{' '}
+                <span className="font-medium">{totalItems}</span> results
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={!hasPrevPage}
+                  className={`relative inline-flex items-center rounded-l-md px-2 py-2 ${!hasPrevPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+                >
+                  <span className="sr-only">Previous</span>
+                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Show pages around current page
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === pageNum ? 'z-10 bg-primary text-primary-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : 'text-base-content ring-1 ring-inset ring-base-300 hover:bg-base-200 focus:outline-offset-0'}`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={!hasNextPage}
+                  className={`relative inline-flex items-center rounded-r-md px-2 py-2 ${!hasNextPage ? 'text-base-300' : 'text-base-content hover:bg-base-200'}`}
+                >
+                  <span className="sr-only">Next</span>
+                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
       </Card>
 
       {/* Sale Form Modal */}

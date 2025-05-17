@@ -5,7 +5,9 @@ import Table from '../components/common/Table';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import BrandModal from '../components/modals/BrandModal';
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiTrash2 } from 'react-icons/fi';
+import { TbEdit } from 'react-icons/tb';
+import { MdPlaylistRemove } from 'react-icons/md';
 
 const Brands: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -83,15 +85,24 @@ const Brands: React.FC = () => {
   }, [currentPage, pageSize]);
   
   const handleSearch = () => {
-    if (!searchQuery) {
+    setIsLoading(true);
+    setCurrentPage(1); // Reset to first page on new search
+  
+    // If search query is empty, fetch all brands
+    if (!searchQuery || searchQuery.trim() === '') {
       fetchBrands();
       return;
     }
-    
-    setIsLoading(true);
-    setCurrentPage(1); // Reset to first page on new search
-    
-    brandService.searchByName(searchQuery, currentPage, pageSize)
+  
+    // Build search parameters
+    const searchParams = {
+      name: searchQuery,
+      page: 1,  // Always start at page 1 for new searches
+      page_size: pageSize
+    };
+  
+    // Use the fetchBrands function with search parameters
+    brandService.searchByName(searchQuery, 1, pageSize)
       .then(data => {
         if (data && typeof data === 'object' && 'results' in data) {
           setBrands(data.results);
@@ -142,30 +153,45 @@ const Brands: React.FC = () => {
       const formData = new FormData();
       formData.append('name', data.name);
       
+      // Handle optional fields
       if (data.origin_country) {
         formData.append('origin_country', data.origin_country);
+      } else {
+        formData.append('origin_country', ''); // Explicitly send empty string for null
       }
       
       if (data.website) {
         formData.append('website', data.website);
+      } else {
+        formData.append('website', '');
       }
       
       if (data.description) {
         formData.append('description', data.description);
+      } else {
+        formData.append('description', '');
       }
       
+      // Only append picture if a new file was selected
       if (data.picture && data.picture[0]) {
         formData.append('picture', data.picture[0]);
       }
       
+      // For updates, we need to use PATCH instead of PUT to avoid clearing the picture
+      // when no new picture is uploaded
       if (editingBrand) {
+        if (data.picture && data.picture.length === 0 && editingBrand.picture) {
+          // Keep existing picture - no need to modify the formData
+          console.log('Keeping existing picture');
+        }
         await brandService.updateBrand(editingBrand.id, formData);
       } else {
         await brandService.createBrand(formData);
       }
       
       setIsModalOpen(false);
-      fetchBrands();
+      setEditingBrand(null); // Reset editing state
+      fetchBrands(); // Refresh the list
     } catch (err: any) {
       console.error('Error saving brand:', err);
       setError('Failed to save brand. Please try again.');
@@ -187,28 +213,27 @@ const Brands: React.FC = () => {
       header: 'Actions',
       accessor: 'id',
       render: (_: any, item: Brand) => (
-        <div className="flex gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+        <div className="flex space-x-2">
+          <button 
+            className="btn btn-sm btn-tertiary text-info" 
             onClick={(e) => {
               e.stopPropagation();
               handleEditBrand(item);
             }}
+            title="Edit"
           >
-            Edit
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-error" 
+            <TbEdit size={20}/>
+          </button>
+          <button 
+            className="btn btn-sm btn-tertiary text-error" 
             onClick={(e) => {
               e.stopPropagation();
               handleDeleteBrand(item.id);
             }}
+            title="Delete"
           >
-            Delete
-          </Button>
+            <MdPlaylistRemove size={20} />
+          </button>
         </div>
       )
     }

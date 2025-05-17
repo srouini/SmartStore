@@ -1,4 +1,5 @@
 import api from './axios';
+import { PaginatedResponse } from './supplierService';
 
 export interface PurchaseItem {
   id: number;
@@ -55,7 +56,7 @@ const purchaseService = {
   // Get all purchases
   getAllPurchases: async (params?: Record<string, any>) => {
     try {
-      const response = await api.get('purchases/', { params });
+      const response = await api.get<PaginatedResponse<Purchase>>('purchases/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -103,9 +104,13 @@ const purchaseService = {
   },
 
   // Search purchases by reference number
-  searchByReferenceNumber: async (referenceNumber: string) => {
+  searchByReferenceNumber: async (referenceNumber: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`purchases/?reference_number=${referenceNumber}`);
+      const params: Record<string, any> = { reference_number: referenceNumber };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Purchase>>('purchases/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -113,9 +118,13 @@ const purchaseService = {
   },
 
   // Get purchases by date range
-  getByDateRange: async (startDate: string, endDate: string) => {
+  getByDateRange: async (startDate: string, endDate: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`purchases/?start_date=${startDate}&end_date=${endDate}`);
+      const params: Record<string, any> = { start_date: startDate, end_date: endDate };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Purchase>>('purchases/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -123,9 +132,13 @@ const purchaseService = {
   },
 
   // Get purchases by payment status
-  getByPaymentStatus: async (status: string) => {
+  getByPaymentStatus: async (status: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`purchases/?payment_status=${status}`);
+      const params: Record<string, any> = { payment_status: status };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Purchase>>('purchases/', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -133,9 +146,13 @@ const purchaseService = {
   },
 
   // Get purchases by supplier
-  getBySupplier: async (supplierName: string) => {
+  getBySupplier: async (supplierName: string, page?: number, pageSize?: number) => {
     try {
-      const response = await api.get(`purchases/?supplier=${supplierName}`);
+      const params: Record<string, any> = { supplier: supplierName };
+      if (page) params.page = page;
+      if (pageSize) params.page_size = pageSize;
+      
+      const response = await api.get<PaginatedResponse<Purchase>>('purchases/', { params });
       return response.data;
     } catch (error) {
       throw error;

@@ -73,8 +73,9 @@ const Login: React.FC = () => {
     <div className="hero min-h-screen bg-base-200">
       <div className="hero-content flex-col">
         <div className="text-center">
-          <h1 className="text-5xl font-bold mb-2">SmartStore</h1>
-          <p className="text-xl">Phone Store Management System</p>
+          <div className="flex justify-center mb-10">
+            <h1 className="text-5xl font-bold">VoltLink</h1>
+          </div>
         </div>
         <div className="card flex-shrink-0 w-full min-w-[400px] shadow-2xl bg-base-100">
           <form className="card-body " onSubmit={handleSubmit(onSubmit)}>
